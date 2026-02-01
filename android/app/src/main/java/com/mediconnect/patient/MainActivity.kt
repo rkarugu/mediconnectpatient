@@ -4,8 +4,6 @@ import android.os.Build
 import android.os.Bundle
 
 import com.facebook.react.ReactActivity
-import com.mediconnect.patient.BuildConfig
-import com.mediconnect.patient.R
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
