@@ -40,19 +40,37 @@ export default function LabConsentScreen({ navigation, route }: any) {
   const handleConfirm = async () => {
     if (!request) return;
 
-    setConfirming(true);
-    try {
-      await labService.confirmAndPay(requestId, 'mpesa');
-      Alert.alert(
-        'Success',
-        'Lab test confirmed successfully. A sample collector will be dispatched shortly.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to confirm lab request');
-    } finally {
-      setConfirming(false);
-    }
+    const testsTotal = request.tests?.reduce((sum, test) => sum + (parseFloat(String(test.price)) || 0), 0) || 0;
+    const fee = parseFloat(String(request.collection_fee)) || 0;
+    const total = testsTotal + fee;
+
+    Alert.alert(
+      'Confirm Wallet Payment',
+      `Pay KES ${total.toLocaleString()} from your wallet for lab tests?\n\nBreakdown:\n• Lab Tests: KES ${testsTotal.toLocaleString()}\n• Sample Collection: KES ${fee.toLocaleString()}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pay via Wallet',
+          onPress: async () => {
+            setConfirming(true);
+            try {
+              const result = await labService.confirmAndPay(requestId, 'wallet');
+              const newBalance = result?.payment?.new_wallet_balance;
+              Alert.alert(
+                'Payment Successful',
+                `KES ${total.toLocaleString()} paid from your wallet.${newBalance != null ? `\nNew wallet balance: KES ${Number(newBalance).toLocaleString()}` : ''}\n\nA sample collector will be dispatched shortly.`,
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
+              );
+            } catch (error: any) {
+              const msg = error?.response?.data?.message || error.message || 'Failed to confirm lab request';
+              Alert.alert('Payment Failed', msg);
+            } finally {
+              setConfirming(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDecline = () => {
@@ -106,7 +124,9 @@ export default function LabConsentScreen({ navigation, route }: any) {
     );
   }
 
-  const totalCost = request.tests?.reduce((sum, test) => sum + (test.price || 0), 0) || 0;
+  const testsSubtotal = request.tests?.reduce((sum, test) => sum + (parseFloat(String(test.price)) || 0), 0) || 0;
+  const collectionFee = parseFloat(String(request.collection_fee)) || 0;
+  const totalCost = testsSubtotal + collectionFee;
 
   return (
     <View style={styles.container}>
@@ -159,9 +179,15 @@ export default function LabConsentScreen({ navigation, route }: any) {
                   )}
                 </View>
               </View>
-              <Text style={styles.testPrice}>KES {test.price?.toLocaleString() || '0'}</Text>
+              <Text style={styles.testPrice}>KES {(parseFloat(String(test.price)) || 0).toLocaleString()}</Text>
             </View>
           ))}
+          {collectionFee > 0 && (
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Collection Fee</Text>
+              <Text style={styles.feeAmount}>KES {collectionFee.toLocaleString()}</Text>
+            </View>
+          )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Cost</Text>
             <Text style={styles.totalAmount}>KES {totalCost.toLocaleString()}</Text>
@@ -211,7 +237,7 @@ export default function LabConsentScreen({ navigation, route }: any) {
 
         <View style={styles.buttonsContainer}>
           <Button
-            title={confirming ? 'Confirming...' : 'Confirm & Pay'}
+            title={confirming ? 'Processing Payment...' : 'Confirm & Pay via Wallet'}
             onPress={handleConfirm}
             loading={confirming}
             disabled={confirming}
@@ -371,12 +397,32 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
   },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.sm,
+    marginTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  feeLabel: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+  },
+  feeAmount: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: SPACING.md,
     marginTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.primary,
   },
   totalLabel: {
     ...TYPOGRAPHY.body,

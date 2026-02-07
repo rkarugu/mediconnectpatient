@@ -1,89 +1,197 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
+import { validatePhone } from '../utils/validation';
+import { parseAuthError, formatErrorMessage } from '../utils/authHelpers';
+import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
-export default function GooglePhoneScreen({ navigation, route }: any) {
-  const { idToken, email } = route?.params ?? {};
+export default function GooglePhoneScreen({ route, navigation }: any) {
   const [phone, setPhone] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuthStore();
+  
+  const { email, name, googleId } = route.params;
 
-  const { setAuth } = useAuthStore();
-
-  const canSubmit = useMemo(() => Boolean(idToken) && phone.trim().length > 0, [idToken, phone]);
-
-  const handleContinue = async () => {
-    if (!idToken) {
-      Alert.alert('Error', 'Missing Google token. Please try again.');
-      navigation.replace('Login');
-      return;
-    }
-
-    if (!phone.trim()) {
+  const handleSubmit = async () => {
+    if (!phone) {
       Alert.alert('Error', 'Please enter your phone number');
       return;
     }
 
-    setIsLoading(true);
+    if (!validatePhone(phone)) {
+      Alert.alert('Error', 'Please enter a valid phone number (10 digits or with country code)');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const response = await authService.googleLogin({ idToken, phone: phone.trim() });
-      if (response.success && response.user && response.token) {
-        await setAuth(response.user, response.token);
-        navigation.replace('Main');
-      } else {
-        Alert.alert('Google Sign In Failed', response.message);
-      }
+      const result = await authService.verifyGooglePhone({
+        email,
+        phone,
+        google_id: googleId
+      });
+      
+      await login(result.token, result.user);
     } catch (error: any) {
-      const msg = error?.response?.data?.message ?? error?.message ?? 'Something went wrong';
-      Alert.alert('Google Sign In Failed', msg);
+      const errorMessage = parseAuthError(error);
+      Alert.alert('Phone Verification Failed', formatErrorMessage(errorMessage));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f5f5f5' }}>
-      <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>Almost done</Text>
-      <Text style={{ fontSize: 14, marginBottom: 24, textAlign: 'center', color: '#666' }}>
-        We need your phone number to complete your account.
-      </Text>
-
-      {!!email && (
-        <Text style={{ fontSize: 14, marginBottom: 16, textAlign: 'center', color: '#444' }}>{email}</Text>
-      )}
-
-      <TextInput
-        placeholder="Phone"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        style={{
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
-          fontSize: 16,
-        }}
-        editable={!isLoading}
-      />
-
-      <TouchableOpacity
-        onPress={handleContinue}
-        disabled={!canSubmit || isLoading}
-        style={{
-          backgroundColor: !canSubmit || isLoading ? '#ccc' : '#007AFF',
-          paddingVertical: 14,
-          borderRadius: 8,
-          alignItems: 'center',
-        }}
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Continue</Text>}
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.replace('Login')} style={{ marginTop: 16 }}>
-        <Text style={{ color: '#007AFF', fontSize: 14 }}>Back to login</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.header}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="call-outline" size={48} color={COLORS.primary} />
+          </View>
+          <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.subtitle}>
+            Hi {name}, we need your phone number to complete your registration
+          </Text>
+        </View>
+
+        <View style={styles.form}>
+          <View style={styles.infoCard}>
+            <Ionicons name="information-circle" size={20} color={COLORS.info} />
+            <Text style={styles.infoText}>
+              Your phone number is required for appointment confirmations and emergency contacts
+            </Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Ionicons name="call-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number (e.g., 0712345678)"
+              placeholderTextColor={COLORS.textSecondary}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={15}
+              editable={!loading}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.buttonText}>Complete Registration</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = {
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: SPACING.lg,
+  },
+  backButton: {
+    padding: SPACING.xs,
+    marginBottom: SPACING.lg,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: SPACING.xl * 2,
+  },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: COLORS.primaryLight + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  form: {
+    width: '100%',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.info + '10',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xl,
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+    fontSize: 14,
+    color: COLORS.info,
+    lineHeight: 20,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.md,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: SPACING.sm,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  button: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+};

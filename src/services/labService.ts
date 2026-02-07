@@ -45,6 +45,7 @@ export interface LabTestWithResults {
   code: string;
   category: string;
   description: string;
+  price: number;
   has_results: boolean;
   results: LabResult[];
 }
@@ -62,6 +63,8 @@ export interface LabRequestDetail {
   medic_name: string;
   tests: LabTestWithResults[];
   has_critical: boolean;
+  collection_fee: number;
+  total_amount: number;
 }
 
 export interface PendingLabRequest {

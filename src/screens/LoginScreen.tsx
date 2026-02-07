@@ -1,209 +1,315 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/authService';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { GOOGLE_ANDROID_CLIENT_ID, GOOGLE_EXPO_CLIENT_ID, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '../config/googleAuth';
+import { validateEmail, validatePhone, isEmailOrPhone } from '../utils/validation';
+import { parseAuthError, formatErrorMessage } from '../utils/authHelpers';
+import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }: any) {
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const { setAuth } = useAuthStore();
 
-  const { setAuth, loadAuth } = useAuthStore();
-
-  // Only initialize Google auth if at least one client ID is configured
-  const isGoogleConfigured = Boolean(GOOGLE_EXPO_CLIENT_ID || GOOGLE_ANDROID_CLIENT_ID || GOOGLE_IOS_CLIENT_ID || GOOGLE_WEB_CLIENT_ID);
+  // Only initialize Google auth if client IDs are configured
+  const googleAuthEnabled = !!(GOOGLE_ANDROID_CLIENT_ID || GOOGLE_WEB_CLIENT_ID);
   
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest(
-    isGoogleConfigured ? {
-      expoClientId: GOOGLE_EXPO_CLIENT_ID || undefined,
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
+    googleAuthEnabled ? {
+      clientId: GOOGLE_WEB_CLIENT_ID || undefined,
       iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
       androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
       webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
-    } : {
-      // Provide dummy config to prevent hook error - button will be hidden anyway
-      clientId: 'not-configured',
-    }
+    } : { clientId: 'placeholder' } // Placeholder to prevent crash when not configured
   );
 
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleSignIn(response.params.id_token);
+    }
+  }, [response]);
+
+  const handleGoogleSignIn = async (idToken: string) => {
+    try {
+      setLoading(true);
+      const result = await authService.googleLogin({ idToken });
+      
+      if (result.user.phone_verified === false) {
+        navigation.navigate('GooglePhone', { 
+          email: result.user.email,
+          name: result.user.name,
+          googleId: result.user.google_id 
+        });
+      } else {
+        await setAuth(result.user, result.token);
+      }
+    } catch (error: any) {
+      const errorMessage = parseAuthError(error);
+      Alert.alert('Google Sign In Failed', formatErrorMessage(errorMessage));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
-    if (!identifier || !password) {
-      Alert.alert('Error', 'Please enter email/phone and password');
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email/phone and password');
       return;
     }
 
-    setIsLoading(true);
+    const inputType = isEmailOrPhone(email);
+    if (!inputType) {
+      Alert.alert('Error', 'Please enter a valid email address or phone number');
+      return;
+    }
+
+    if (inputType === 'email' && !validateEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (inputType === 'phone' && !validatePhone(email)) {
+      Alert.alert('Error', 'Please enter a valid phone number (10 digits or with country code)');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const response = await authService.login({ identifier, password });
-      if (response.success && response.token && response.user) {
-        await setAuth(response.user, response.token);
-        // Navigate to main app (replace route)
-        navigation.replace('Main');
-      } else {
-        Alert.alert('Login Failed', response.message);
-      }
+      const result = await authService.login({ 
+        identifier: email, 
+        password 
+      });
+      await setAuth(result.user, result.token);
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Something went wrong');
+      const errorMessage = parseAuthError(error);
+      Alert.alert('Login Failed', formatErrorMessage(errorMessage));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-
-  const handleGoogleLogin = async () => {
-    try {
-      if (!GOOGLE_EXPO_CLIENT_ID && !GOOGLE_ANDROID_CLIENT_ID && !GOOGLE_IOS_CLIENT_ID && !GOOGLE_WEB_CLIENT_ID) {
-        Alert.alert(
-          'Google not configured',
-          'Missing Google client IDs. Add EXPO_PUBLIC_GOOGLE_*_CLIENT_ID env vars and restart Expo.'
-        );
-        return;
-      }
-      if (!googleRequest) {
-        Alert.alert('Google Sign In Failed', 'Google request not ready. Please try again.');
-        return;
-      }
-
-      setIsGoogleLoading(true);
-      await googlePromptAsync({ useProxy: true });
-    } catch (error: any) {
-      const msg = error?.response?.data?.message ?? error?.message ?? 'Something went wrong';
-      Alert.alert('Google Sign In Failed', msg);
-    } finally {
-      // We stop loading in the response handler below.
-    }
-  };
-
-  useEffect(() => {
-    const run = async () => {
-      if (googleResponse?.type !== 'success') {
-        if (googleResponse?.type === 'dismiss' || googleResponse?.type === 'cancel') {
-          setIsGoogleLoading(false);
-        }
-        return;
-      }
-
-      const idToken = (googleResponse as any)?.params?.id_token as string | undefined;
-      if (!idToken) {
-        setIsGoogleLoading(false);
-        Alert.alert('Google Sign In Failed', 'Missing id_token from Google');
-        return;
-      }
-
-      try {
-        const response = await authService.googleLogin({ idToken });
-        if (response.success && response.user && response.token) {
-          await setAuth(response.user, response.token);
-          navigation.replace('Main');
-          return;
-        }
-        Alert.alert('Google Sign In Failed', response.message || 'Unable to sign in');
-      } catch (error: any) {
-        const status = error?.response?.status;
-        const code = error?.response?.data?.error_code;
-        if (status === 422 && code === 'PHONE_REQUIRED') {
-          navigation.navigate('GooglePhone', { idToken });
-          return;
-        }
-
-        const msg = error?.response?.data?.message ?? error?.message ?? 'Something went wrong';
-        Alert.alert('Google Sign In Failed', msg);
-      } finally {
-        setIsGoogleLoading(false);
-      }
-    };
-
-    run();
-  }, [googleResponse, navigation, setAuth]);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f5f5f5' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 32, textAlign: 'center' }}>
-        MediConnect Patient
-      </Text>
-      <Text style={{ fontSize: 16, marginBottom: 32, textAlign: 'center', color: '#666' }}>
-        Login to request medical services
-      </Text>
-
-      <TextInput
-        placeholder="Email or Phone Number"
-        value={identifier}
-        onChangeText={setIdentifier}
-        autoCapitalize="none"
-        style={{
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
-          fontSize: 16,
-        }}
-        editable={!isLoading}
-      />
-
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={{
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 24,
-          fontSize: 16,
-        }}
-        editable={!isLoading}
-      />
-
-      <TouchableOpacity
-        onPress={handleLogin}
-        disabled={isLoading}
-        style={{
-          backgroundColor: isLoading ? '#ccc' : '#007AFF',
-          paddingVertical: 14,
-          borderRadius: 8,
-          alignItems: 'center',
-        }}
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Log In</Text>
-        )}
-      </TouchableOpacity>
+        <View style={styles.header}>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+        </View>
 
-      {isGoogleConfigured && (
-        <TouchableOpacity
-          onPress={handleGoogleLogin}
-          disabled={isGoogleLoading || isLoading}
-          style={{
-            backgroundColor: isGoogleLoading || isLoading ? '#ccc' : '#111827',
-            paddingVertical: 14,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginTop: 12,
-          }}
-        >
-          {isGoogleLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Continue with Google</Text>
+        <View style={styles.form}>
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email or Phone Number"
+              placeholderTextColor={COLORS.textSecondary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={20} 
+                color={COLORS.textSecondary} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('ForgotPassword')}
+            style={styles.forgotPassword}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.buttonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          {googleAuthEnabled && (
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
           )}
-        </TouchableOpacity>
-      )}
 
-      <TouchableOpacity
-        onPress={() => navigation.replace('Register')}
-        style={{ marginTop: 16 }}
-      >
-        <Text style={{ color: '#007AFF', fontSize: 14 }}>Don't have an account? Register</Text>
-      </TouchableOpacity>
-    </View>
+          {googleAuthEnabled && (
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={() => promptAsync()}
+              disabled={!request || loading}
+            >
+              <Ionicons name="logo-google" size={20} color={COLORS.textPrimary} />
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+              <Text style={styles.linkText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = {
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: SPACING.lg,
+  },
+  header: {
+    marginBottom: SPACING.xl * 2,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  form: {
+    width: '100%',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: SPACING.sm,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  eyeIcon: {
+    padding: SPACING.xs,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: SPACING.lg,
+  },
+  forgotPasswordText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  button: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  dividerText: {
+    marginHorizontal: SPACING.md,
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xl,
+  },
+  googleButtonText: {
+    marginLeft: SPACING.sm,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
+  linkText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+};

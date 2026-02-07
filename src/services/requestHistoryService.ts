@@ -95,12 +95,23 @@ class RequestHistoryService {
    * Initiate payment for a service request
    */
   async initiatePayment(requestId: number, paymentData: {
-    phone_number: string;
-    amount: number;
     payment_method: string;
+    phone_number?: string;
+    amount?: number;
   }): Promise<any> {
     try {
-      const response = await apiClient.post(`/patients/requests/${requestId}/pay`, paymentData);
+      // Only include phone_number if payment_method is mpesa
+      const payload: any = {
+        payment_method: paymentData.payment_method,
+      };
+      if (paymentData.payment_method === 'mpesa' && paymentData.phone_number) {
+        payload.phone_number = paymentData.phone_number;
+      }
+      if (paymentData.amount !== undefined) {
+        payload.amount = paymentData.amount;
+      }
+
+      const response = await apiClient.post(`/patients/requests/${requestId}/pay`, payload);
       
       if (response.data.success) {
         return response.data.data;

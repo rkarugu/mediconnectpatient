@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { authService, type RegisterRequest } from '../services/authService';
+import { validateEmail, validatePhone, validatePassword, validateName, validatePasswordMatch } from '../utils/validation';
+import { parseAuthError, formatErrorMessage, isEmailAlreadyExistsError, isPhoneAlreadyExistsError } from '../utils/authHelpers';
+import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 export default function RegisterScreen({ navigation }: any) {
   const [form, setForm] = useState<RegisterRequest>({
@@ -12,18 +16,52 @@ export default function RegisterScreen({ navigation }: any) {
     password: '',
     passwordConfirmation: '',
   });
+  
   const [isLoading, setIsLoading] = useState(false);
-
+  const [errors, setErrors] = useState<Partial<Record<keyof RegisterRequest, string>>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { setAuth } = useAuthStore();
 
-  const handleRegister = async () => {
-    const { firstName, lastName, email, phone, password, passwordConfirmation } = form;
-    if (!firstName || !lastName || !email || !phone || !password || !passwordConfirmation) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
+  const validateForm = (): boolean => {
+    const newErrors: typeof errors = {};
+
+    const firstNameValidation = validateName(form.firstName, 'First name');
+    if (!firstNameValidation.valid) {
+      newErrors.firstName = firstNameValidation.error;
     }
-    if (password !== passwordConfirmation) {
-      Alert.alert('Error', 'Passwords do not match');
+
+    const lastNameValidation = validateName(form.lastName, 'Last name');
+    if (!lastNameValidation.valid) {
+      newErrors.lastName = lastNameValidation.error;
+    }
+
+    const emailValidation = validateEmail(form.email);
+    if (!emailValidation.valid) {
+      newErrors.email = emailValidation.error;
+    }
+
+    const phoneValidation = validatePhone(form.phone);
+    if (!phoneValidation.valid) {
+      newErrors.phone = phoneValidation.error;
+    }
+
+    const passwordValidation = validatePassword(form.password);
+    if (!passwordValidation.valid) {
+      newErrors.password = passwordValidation.error;
+    }
+
+    const passwordMatchValidation = validatePasswordMatch(form.password, form.passwordConfirmation);
+    if (!passwordMatchValidation.valid) {
+      newErrors.passwordConfirmation = passwordMatchValidation.error;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) {
       return;
     }
 
@@ -34,10 +72,18 @@ export default function RegisterScreen({ navigation }: any) {
         await setAuth(response.user, response.token);
         navigation.replace('Main');
       } else {
-        Alert.alert('Registration Failed', response.message);
+        Alert.alert('Registration Failed', response.message || 'Unable to register');
       }
     } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'Something went wrong');
+      if (isEmailAlreadyExistsError(error)) {
+        setErrors({ email: 'This email is already registered. Please login instead.' });
+      } else if (isPhoneAlreadyExistsError(error)) {
+        setErrors({ phone: 'This phone number is already registered. Please login instead.' });
+      } else {
+        const authError = parseAuthError(error);
+        const message = formatErrorMessage(authError);
+        Alert.alert('Registration Failed', message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -45,92 +91,130 @@ export default function RegisterScreen({ navigation }: any) {
 
   const updateField = (field: keyof RegisterRequest, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
   };
 
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f5f5f5' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 32, textAlign: 'center' }}>
-        Register
+  const renderInputField = (
+    label: string,
+    field: keyof RegisterRequest,
+    placeholder: string,
+    keyboardType: 'default' | 'email-address' | 'phone-pad' = 'default',
+    icon: keyof typeof Ionicons.glyphMap = 'person-outline',
+    secureTextEntry: boolean = false,
+    showToggle: boolean = false,
+    toggleState?: boolean,
+    onToggle?: () => void
+  ) => (
+    <View style={{ marginBottom: SPACING.lg }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: SPACING.sm, color: COLORS.textPrimary }}>
+        {label}
       </Text>
-
-      <TextInput
-        placeholder="First Name"
-        value={form.firstName}
-        onChangeText={(v) => updateField('firstName', v)}
-        style={inputStyle}
-        editable={!isLoading}
-      />
-      <TextInput
-        placeholder="Last Name"
-        value={form.lastName}
-        onChangeText={(v) => updateField('lastName', v)}
-        style={inputStyle}
-        editable={!isLoading}
-      />
-      <TextInput
-        placeholder="Email"
-        value={form.email}
-        onChangeText={(v) => updateField('email', v)}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        style={inputStyle}
-        editable={!isLoading}
-      />
-      <TextInput
-        placeholder="Phone"
-        value={form.phone}
-        onChangeText={(v) => updateField('phone', v)}
-        keyboardType="phone-pad"
-        style={inputStyle}
-        editable={!isLoading}
-      />
-      <TextInput
-        placeholder="Password"
-        value={form.password}
-        onChangeText={(v) => updateField('password', v)}
-        secureTextEntry
-        style={inputStyle}
-        editable={!isLoading}
-      />
-      <TextInput
-        placeholder="Confirm Password"
-        value={form.passwordConfirmation}
-        onChangeText={(v) => updateField('passwordConfirmation', v)}
-        secureTextEntry
-        style={inputStyle}
-        editable={!isLoading}
-      />
-
-      <TouchableOpacity
-        onPress={handleRegister}
-        disabled={isLoading}
-        style={{
-          backgroundColor: isLoading ? '#ccc' : '#007AFF',
-          paddingVertical: 14,
-          borderRadius: 8,
-          alignItems: 'center',
-          marginTop: 24,
-        }}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Register</Text>
+      <View style={{
+        borderWidth: 1,
+        borderColor: errors[field] ? COLORS.error : COLORS.border,
+        borderRadius: BORDER_RADIUS.md,
+        paddingHorizontal: SPACING.md,
+        backgroundColor: COLORS.white,
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+        <Ionicons name={icon} size={20} color={COLORS.textSecondary} style={{ marginRight: SPACING.sm }} />
+        <TextInput
+          placeholder={placeholder}
+          value={form[field]}
+          onChangeText={(v) => updateField(field, v)}
+          keyboardType={keyboardType}
+          autoCapitalize={keyboardType === 'email-address' ? 'none' : 'words'}
+          secureTextEntry={secureTextEntry && !toggleState}
+          editable={!isLoading}
+          style={{ flex: 1, paddingVertical: SPACING.md, fontSize: 16, color: COLORS.textPrimary }}
+        />
+        {showToggle && (
+          <TouchableOpacity onPress={onToggle}>
+            <Ionicons name={toggleState ? 'eye-outline' : 'eye-off-outline'} size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.replace('Login')}>
-        <Text style={{ color: '#007AFF', fontSize: 14, marginTop: 16 }}>Already have an account? Login</Text>
-      </TouchableOpacity>
+      </View>
+      {errors[field] && (
+        <Text style={{ fontSize: 12, color: COLORS.error, marginTop: SPACING.xs }}>
+          {errors[field]}
+        </Text>
+      )}
     </View>
   );
-}
 
-const inputStyle = {
-  borderWidth: 1,
-  borderColor: '#ddd',
-  borderRadius: 8,
-  padding: 12,
-  marginBottom: 16,
-  fontSize: 16,
-};
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: SPACING.lg, backgroundColor: COLORS.background }}>
+        <View style={{ marginBottom: SPACING.xl * 2, marginTop: SPACING.lg }}>
+          <Text style={{ fontSize: 28, fontWeight: '700', marginBottom: SPACING.md, textAlign: 'center', color: COLORS.textPrimary }}>
+            Create Account
+          </Text>
+          <Text style={{ fontSize: 16, marginBottom: SPACING.lg, textAlign: 'center', color: COLORS.textSecondary }}>
+            Join MediConnect to request medical services
+          </Text>
+        </View>
+
+        {renderInputField('First Name', 'firstName', 'John', 'default', 'person-outline')}
+        {renderInputField('Last Name', 'lastName', 'Doe', 'default', 'person-outline')}
+        {renderInputField('Email', 'email', 'john@example.com', 'email-address', 'mail-outline')}
+        {renderInputField('Phone Number', 'phone', '+1234567890', 'phone-pad', 'call-outline')}
+        {renderInputField(
+          'Password',
+          'password',
+          'At least 8 characters',
+          'default',
+          'lock-closed-outline',
+          true,
+          true,
+          showPassword,
+          () => setShowPassword(!showPassword)
+        )}
+        {renderInputField(
+          'Confirm Password',
+          'passwordConfirmation',
+          'Confirm your password',
+          'default',
+          'lock-closed-outline',
+          true,
+          true,
+          showConfirmPassword,
+          () => setShowConfirmPassword(!showConfirmPassword)
+        )}
+
+        <View style={{ marginBottom: SPACING.lg, padding: SPACING.md, backgroundColor: '#E8F4F8', borderRadius: BORDER_RADIUS.md }}>
+          <Text style={{ fontSize: 12, color: COLORS.info, lineHeight: 18 }}>
+            <Ionicons name="information-circle" size={14} color={COLORS.info} /> Password must contain at least 8 characters, including uppercase, lowercase, and numbers.
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleRegister}
+          disabled={isLoading}
+          style={{
+            backgroundColor: isLoading ? COLORS.textDisabled : COLORS.primary,
+            paddingVertical: SPACING.md,
+            borderRadius: BORDER_RADIUS.md,
+            alignItems: 'center',
+            marginBottom: SPACING.lg,
+          }}
+        >
+          {isLoading ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: '600' }}>Create Account</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 14 }}>Already have an account? </Text>
+          <TouchableOpacity onPress={() => navigation.replace('Login')}>
+            <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: '600' }}>Login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}

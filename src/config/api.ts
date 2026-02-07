@@ -14,13 +14,11 @@ const inferredHost = (() => {
 })();
 
 const DEFAULT_API_BASE_URL = 'http://10.210.19.13:8000/api';
-const DEFAULT_SOCKET_URL = 'http://10.210.19.13:8000';
+const DEFAULT_SOCKET_URL = 'http://10.210.19.13:3000';
 
 // Read from Expo environment variables (EXPO_PUBLIC_*)
-const env = ((globalThis as any)?.process?.env ?? {}) as Record<string, string | undefined>;
-
-export const API_BASE_URL = env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-export const SOCKET_URL = env.EXPO_PUBLIC_SOCKET_URL ?? DEFAULT_SOCKET_URL;
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+export const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL ?? DEFAULT_SOCKET_URL;
 
 console.log('API Base URL:', API_BASE_URL);
 console.log('Socket URL:', SOCKET_URL);

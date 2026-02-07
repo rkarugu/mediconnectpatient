@@ -30,6 +30,11 @@ export interface GoogleLoginRequest {
   phone?: string;
 }
 
+export interface PhoneLoginRequest {
+  phone: string;
+  firebaseToken: string;
+}
+
 function normalizeAuthResponse(payload: any): AuthResponse {
   const user = payload?.data?.user ?? payload?.user;
   const token = payload?.data?.token ?? payload?.token;
@@ -100,5 +105,14 @@ export const authService = {
   async resetPassword(data: { email: string; password: string; token: string }): Promise<{ success: boolean; message: string }> {
     const response = await apiClient.post('/auth/reset-password', data);
     return response.data;
+  },
+
+  async phoneLogin(data: PhoneLoginRequest): Promise<AuthResponse> {
+    const payload = {
+      phone: data.phone,
+      firebase_token: data.firebaseToken,
+    };
+    const response = await apiClient.post('/auth/phone', payload);
+    return normalizeAuthResponse(response.data);
   },
 };

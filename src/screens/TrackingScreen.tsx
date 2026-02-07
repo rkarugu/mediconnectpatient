@@ -126,7 +126,7 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
       
       // Separate active and completed requests
       const active = allRequests.filter(r => 
-        ['pending', 'accepted', 'in_progress'].includes(r.status)
+        ['pending', 'accepted', 'in_progress', 'on_hold'].includes(r.status)
       );
       const history = allRequests.filter(r => 
         ['completed', 'cancelled', 'rejected'].includes(r.status)
@@ -177,6 +177,33 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
   const handleRequestPress = (request: RequestHistoryItem) => {
     console.log('Request pressed, loading details for ID:', request.id);
     loadRequestDetails(request.id);
+  };
+
+  const handlePayWithWallet = async (requestId: number) => {
+    Alert.alert(
+      'Confirm Wallet Payment',
+      'Pay using your wallet balance?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pay',
+          onPress: async () => {
+            try {
+              const result = await requestHistoryService.initiatePayment(requestId, {
+                payment_method: 'wallet',
+              });
+              Alert.alert('Payment Successful', 'Paid successfully via wallet');
+              // Refresh request details to reflect paid status
+              loadRequestDetails(requestId);
+              loadRequests();
+            } catch (error: any) {
+              console.error('Wallet payment error:', error);
+              Alert.alert('Payment Failed', error.message || 'Payment failed');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCancelRequest = async (requestId: number) => {
@@ -441,10 +468,10 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
                     </View>
                   )}
 
-                  {labRequest.status === 'pending' && (
+                  {(labRequest.status === 'pending' || labRequest.status === 'assigned') && (
                     <Button
                       title="Review & Pay"
-                      onPress={() => navigation.navigate('LabConsent', { labRequestId: labRequest.id })}
+                      onPress={() => navigation.navigate('LabConsent', { requestId: labRequest.id })}
                       style={{ marginTop: SPACING.sm }}
                       size="sm"
                     />
@@ -541,11 +568,18 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
 
         {/* Payment Button - show when service is completed and not paid */}
         {status === 'completed' && selectedRequest.payment_status !== 'paid' && (
-          <Button
-            title="Proceed to Payment"
-            onPress={() => navigation.navigate('Payment', { requestId: selectedRequest.id })}
-            style={{ marginBottom: SPACING.md, backgroundColor: '#2ECC71' }}
-          />
+          <View>
+            <Button
+              title="Pay with Wallet"
+              onPress={() => handlePayWithWallet(selectedRequest.id)}
+              style={{ marginBottom: SPACING.sm, backgroundColor: '#3498DB' }}
+            />
+            <Button
+              title="Other Payment Options"
+              onPress={() => navigation.navigate('Payment', { requestId: selectedRequest.id })}
+              style={{ marginBottom: SPACING.md, backgroundColor: '#2ECC71' }}
+            />
+          </View>
         )}
 
         {/* Review Button - show when paid but not reviewed */}

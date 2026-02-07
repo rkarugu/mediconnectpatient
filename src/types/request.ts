@@ -35,6 +35,8 @@ export interface CreateRequestPayload {
   scheduled_time?: string;
   notes?: string;
   is_emergency?: boolean;
+  estimated_price?: number;
+  payment_method?: 'cash' | 'mpesa' | 'wallet' | 'insurance' | 'card';
 }
 
 export interface RequestResponse {

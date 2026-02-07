@@ -48,6 +48,8 @@ export default function ProfileScreen({ navigation }: any) {
 
     { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
 
+    { icon: 'wallet-outline', label: 'My Wallet', onPress: () => navigation.navigate('Wallet') },
+
     { icon: 'card-outline', label: 'Payment Methods', onPress: () => {} },
 
     { icon: 'time-outline', label: 'Request History', onPress: () => navigation.navigate('Tracking') },

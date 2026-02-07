@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { Button, Input, LoadingSpinner, Card } from '../components';
 import ServiceTypeCard from '../components/ServiceTypeCard';
+import PaymentOptionsModal, { PaymentMethod } from '../components/PaymentOptionsModal';
 import medicService from '../services/medicService';
 import requestService from '../services/requestService';
 import { MedicalSpecialty, Medic } from '../types/medic';
@@ -44,6 +45,9 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [estimatedPrice, setEstimatedPrice] = useState(0);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [walletBalance, setWalletBalance] = useState(5000); // TODO: Fetch actual wallet balance
 
   useEffect(() => {
     loadSpecialties();
@@ -86,8 +90,26 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
       return;
     }
 
+    // Show payment selection modal
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentMethodSelected = async (method: PaymentMethod) => {
+    setSelectedPaymentMethod(method);
+    setShowPaymentModal(false);
+
+    // If insurance selected, verify coverage first
+    if (method === 'insurance') {
+      // TODO: Implement insurance verification API call
+      Alert.alert('Insurance Verification', 'Verifying your insurance coverage...');
+    }
+
     setLoading(true);
     try {
+      if (!selectedSpecialty) {
+        throw new Error('No specialty selected');
+      }
+      
       const payload = {
         specialty_id: selectedSpecialty,
         medic_id: selectedMedic?.id,
@@ -98,6 +120,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         notes: notes,
         is_emergency: isEmergency,
         estimated_price: getSelectedSpecialtyFee(),
+        payment_method: method,
       };
 
       const response = await requestService.createRequest(payload);
@@ -437,6 +460,14 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         {step === 2 && renderLocationConfirmation()}
         {step === 3 && renderScheduling()}
       </ScrollView>
+
+      <PaymentOptionsModal
+        visible={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSelectPayment={handlePaymentMethodSelected}
+        estimatedPrice={estimatedPrice}
+        walletBalance={walletBalance}
+      />
     </View>
   );
 }
