@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 
 import React, { useEffect } from 'react';
 
-import { Platform } from 'react-native';
+import { Platform, View, StyleSheet, Image } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
 
@@ -13,6 +13,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const TAB_ICONS: Record<string, any> = {
+  Home: require('./assets/Hospital.jpg'),
+  Tracking: require('./assets/Appointment.jpg'),
+  Profile: require('./assets/DoctorConsultation.jpg'),
+};
 
 import { useAuthStore } from './src/store/authStore';
 
@@ -73,34 +80,13 @@ function MainTabs() {
 
         headerShown: false,
 
-        tabBarIcon: ({ focused, color, size }) => {
-
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-
-
-          if (route.name === 'Home') {
-
-            iconName = focused ? 'home' : 'home-outline';
-
-          } else if (route.name === 'Tracking') {
-
-            iconName = focused ? 'list' : 'list-outline';
-
-          } else if (route.name === 'Profile') {
-
-            iconName = focused ? 'person' : 'person-outline';
-
-          } else {
-
-            iconName = 'help-outline';
-
-          }
-
-
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-
+        tabBarIcon: ({ focused }) => {
+          const src = TAB_ICONS[route.name];
+          return (
+            <View style={[tabStyles.iconWrap, focused && tabStyles.iconActive]}>
+              <Image source={src} style={tabStyles.iconImg} resizeMode="contain" />
+            </View>
+          );
         },
 
         tabBarActiveTintColor: COLORS.primary,
@@ -260,6 +246,29 @@ function AppContent() {
 }
 
 
+
+const tabStyles = StyleSheet.create({
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.55,
+  },
+  iconActive: {
+    opacity: 1,
+    backgroundColor: '#EBF5FF',
+    ...Platform.select({
+      ios: { shadowColor: '#2B7BB9', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+      android: { elevation: 4 },
+    }),
+  },
+  iconImg: {
+    width: 28,
+    height: 28,
+  },
+});
 
 export default function App() {
 

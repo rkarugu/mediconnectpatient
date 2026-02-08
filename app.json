@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "MediConnect Patient",
+    "name": "MediConnect",
     "slug": "mediconnect-patient-app",
     "scheme": "mediconnect-patient",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/mediconnect logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/mediconnect logo.png",
+      "resizeMode": "auto",
+      "backgroundColor": "#0B3D6B"
     },
     "ios": {
       "supportsTablet": true,
@@ -20,8 +20,8 @@
     "android": {
       "package": "com.mediconnect.patient",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/mediconnect logo.png",
+        "backgroundColor": "#0B3D6B"
       },
       "usesCleartextTraffic": true
     },
