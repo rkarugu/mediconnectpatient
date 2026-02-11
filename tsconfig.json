@@ -14,13 +14,13 @@
       "dom.iterable",
       "esnext"
     ],
+    "module": "es2015",
     "moduleResolution": "bundler",
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
   "include": [
     "src/**/*",
-    "App.tsx",
     "App.tsx"
   ],
   "exclude": [

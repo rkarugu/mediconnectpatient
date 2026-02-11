@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SOCKET_URL as CONFIG_SOCKET_URL } from '../config/api';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -13,8 +14,7 @@ class SocketService {
       return;
     }
 
-    // Use your local IP for mobile device access
-    const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.210.19.13:3000';
+    const SOCKET_URL = CONFIG_SOCKET_URL;
 
     this.socket = io(SOCKET_URL, {
       auth: {

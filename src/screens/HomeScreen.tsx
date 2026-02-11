@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constant
 import { LoadingSpinner, BottomSheet, Button } from '../components';
 import MedicCard from '../components/MedicCard';
 import { useAuthStore } from '../store/authStore';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -47,67 +48,16 @@ export default function HomeScreen({ navigation }: any) {
   const [showMedicsList, setShowMedicsList] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    requestLocationPermission();
-    loadSpecialties();
-  }, []);
-
-  useEffect(() => {
-    if (location) {
-      loadNearbyMedics();
-    }
-  }, [location, selectedSpecialty]);
-
-  const requestLocationPermission = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Location Permission Required',
-          'Please enable location services to find nearby medics.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Location.requestForegroundPermissionsAsync() },
-          ]
-        );
-        setLoading(false);
-        return;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-
-      setLocation(currentLocation);
-      
-      const newRegion = {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      };
-      
-      setRegion(newRegion);
-      mapRef.current?.animateToRegion(newRegion, 1000);
-      setLoading(false);
-    } catch (error) {
-      console.error('Location permission error:', error);
-      Alert.alert('Error', 'Failed to get your location. Using default location.');
-      setLoading(false);
-    }
-  };
-
-  const loadSpecialties = async () => {
+  const loadSpecialties = useCallback(async () => {
     try {
       const data = await medicService.getMedicalSpecialties();
       setSpecialties(data);
     } catch (error) {
       console.error('Load specialties error:', error);
     }
-  };
+  }, []);
 
-  const loadNearbyMedics = async () => {
+  const loadNearbyMedics = useCallback(async () => {
     if (!location) return;
 
     setLoadingMedics(true);
@@ -125,7 +75,68 @@ export default function HomeScreen({ navigation }: any) {
     } finally {
       setLoadingMedics(false);
     }
+  }, [location, selectedSpecialty]);
+
+  useEffect(() => {
+    requestLocationPermission();
+    loadSpecialties();
+  }, [loadSpecialties]);
+
+  useEffect(() => {
+    if (location) {
+      loadNearbyMedics();
+    }
+  }, [location, selectedSpecialty, loadNearbyMedics]);
+
+  useRealtimeRefresh(loadNearbyMedics, {
+    events: ['medic.location_update', 'medic.assigned', 'service_request.accepted'],
+    intervalMs: 30000,
+    enabled: !!location,
+  });
+
+  const requestLocationPermission = async () => {
+    try {
+      console.log('Requesting location permission...');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Location permission status:', status);
+      
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        Alert.alert(
+          'Location Permission Required',
+          'Please enable location services to find nearby medics. You can still use the app with the default location.',
+          [{ text: 'OK' }]
+        );
+        setLoading(false);
+        return;
+      }
+
+      console.log('Getting current position...');
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeoutMs: 10000,
+      });
+      console.log('Got location:', currentLocation.coords);
+
+      setLocation(currentLocation);
+      
+      const newRegion = {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      };
+      
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 1000);
+      setLoading(false);
+    } catch (error: any) {
+      console.error('Location permission error:', error);
+      console.error('Error details:', error.message, error.code);
+      setLoading(false);
+    }
   };
+
 
   const handleMedicPress = (medic: Medic) => {
     setSelectedMedic(medic);

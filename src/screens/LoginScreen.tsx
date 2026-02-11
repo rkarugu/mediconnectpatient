@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { GOOGLE_ANDROID_CLIENT_ID, GOOGLE_EXPO_CLIENT_ID, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '../config/googleAuth';
 import { validateEmail, validatePhone, isEmailOrPhone } from '../utils/validation';
-import { parseAuthError, formatErrorMessage } from '../utils/authHelpers';
+import { parseAuthError, formatErrorMessage, isEmailNotVerifiedError, getEmailFromError } from '../utils/authHelpers';
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -89,6 +89,12 @@ export default function LoginScreen({ navigation }: any) {
       });
       await setAuth(result.user, result.token);
     } catch (error: any) {
+      // Check if the error is due to email not being verified
+      if (isEmailNotVerifiedError(error)) {
+        const userEmail = getEmailFromError(error) || email;
+        navigation.navigate('VerificationPending', { email: userEmail });
+        return;
+      }
       const errorMessage = parseAuthError(error);
       Alert.alert('Login Failed', formatErrorMessage(errorMessage));
     } finally {

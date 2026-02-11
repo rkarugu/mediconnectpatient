@@ -68,9 +68,9 @@ export default function RegisterScreen({ navigation }: any) {
     setIsLoading(true);
     try {
       const response = await authService.register(form);
-      if (response.success && response.user && response.token) {
-        await setAuth(response.user, response.token);
-        navigation.replace('Main');
+      if (response.success) {
+        // Navigate to verification pending screen instead of auto-login
+        navigation.replace('VerificationPending', { email: form.email });
       } else {
         Alert.alert('Registration Failed', response.message || 'Unable to register');
       }

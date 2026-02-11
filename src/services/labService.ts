@@ -53,6 +53,8 @@ export interface LabTestWithResults {
 export interface LabRequestDetail {
   id: number;
   status: string;
+  payment_status: string;
+  payment_method: string;
   is_urgent: boolean;
   clinical_notes: string | null;
   created_at: string;
@@ -70,6 +72,8 @@ export interface LabRequestDetail {
 export interface PendingLabRequest {
   id: number;
   status: string;
+  payment_status: string;
+  payment_method: string;
   is_urgent: boolean;
   created_at: string;
   lab_facility: LabFacility | null;

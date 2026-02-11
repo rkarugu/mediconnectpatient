@@ -183,6 +183,9 @@ export function NotificationProvider({ children }: Props) {
 
     // Lab request created - patient needs to consent/pay
     socketService.on('lab_request.created', (data) => {
+      const paymentMethod = data.payment_method || 'wallet';
+      const paymentLabel = paymentMethod === 'mpesa' ? 'M-Pesa' : paymentMethod === 'wallet' ? 'Wallet' : paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'insurance' ? 'Insurance' : 'Wallet';
+
       handleNotification({
         title: '🧪 Lab Test Requested',
         message: data.message || 'Your doctor has ordered lab tests. Please review and confirm.',
@@ -192,11 +195,11 @@ export function NotificationProvider({ children }: Props) {
       // Show alert to navigate to consent screen
       Alert.alert(
         '🧪 Lab Tests Ordered',
-        `${data.medic_name || 'Your doctor'} has ordered lab tests.\n\nTotal: KES ${data.total_amount?.toLocaleString() || '0'}\n\nPlease review and confirm payment to proceed with sample collection.`,
+        `${data.medic_name || 'Your doctor'} has ordered lab tests.\n\nTotal: KES ${data.total_amount?.toLocaleString() || '0'}\nPayment via: ${paymentLabel}\n\nPlease review and confirm payment to proceed with sample collection.`,
         [
           { text: 'Later', style: 'cancel' },
           {
-            text: 'Review & Pay',
+            text: `Review & Pay via ${paymentLabel}`,
             onPress: () => {
               // Navigate using the navigation service
               if (data.request_id) {

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { Card } from '../components';
 import labService, { LabRequestSummary, PendingLabRequest } from '../services/labService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; label: string; action?: string }> = {
   pending: { color: '#F59E0B', bgColor: '#FEF3C7', label: 'Awaiting Confirmation', action: 'Tap to confirm & pay' },
@@ -45,6 +46,12 @@ export default function LabRequestsScreen({ navigation }: any) {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  useRealtimeRefresh(fetchRequests, {
+    events: ['lab_request.created', 'lab_results.ready', 'service.completed'],
+    intervalMs: 30000,
+    enabled: true,
+  });
 
   const onRefresh = () => {
     setRefreshing(true);

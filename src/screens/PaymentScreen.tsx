@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { requestHistoryService } from '../services/requestHistoryService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 const COLORS = {
   primary: '#2B7BB9',
@@ -43,11 +44,7 @@ export default function PaymentScreen({ navigation, route }: any) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'card'>('mpesa');
 
-  useEffect(() => {
-    loadServiceDetails();
-  }, []);
-
-  const loadServiceDetails = async () => {
+  const loadServiceDetails = useCallback(async () => {
     try {
       const details = await requestHistoryService.getRequestDetails(requestId);
       setServiceDetails({
@@ -63,7 +60,17 @@ export default function PaymentScreen({ navigation, route }: any) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [requestId]);
+
+  useEffect(() => {
+    loadServiceDetails();
+  }, [loadServiceDetails]);
+
+  useRealtimeRefresh(loadServiceDetails, {
+    events: ['payment.processed', 'service.completed'],
+    intervalMs: 30000,
+    enabled: true,
+  });
 
   const validatePhoneNumber = (phone: string) => {
     // Kenyan phone number validation

@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../config/api';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 
 interface WalletData {
@@ -74,6 +75,12 @@ export default function WalletScreen({ navigation }: any) {
   useEffect(() => {
     loadWallet();
   }, [loadWallet]);
+
+  useRealtimeRefresh(loadWallet, {
+    events: ['payment.processed', 'service.completed', 'lab_request.created'],
+    intervalMs: 30000,
+    enabled: true,
+  });
 
   const handleRefresh = () => {
     setRefreshing(true);

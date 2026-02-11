@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { useAuthStore } from '../store/authStore';
 
 const inferredHost = (() => {
   const constantsAny = Constants as any;
@@ -13,15 +14,20 @@ const inferredHost = (() => {
   return hostUri ? hostUri.split(':')[0] : undefined;
 })();
 
-const DEFAULT_API_BASE_URL = 'http://10.210.19.13:8000/api';
-const DEFAULT_SOCKET_URL = 'http://10.210.19.13:3000';
+const DEFAULT_API_BASE_URL = 'http://10.16.4.13/api';
+const DEFAULT_SOCKET_URL = 'http://10.16.4.13';
 
 // Read from Expo environment variables (EXPO_PUBLIC_*)
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 export const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL ?? DEFAULT_SOCKET_URL;
 
+// Storage URL for accessing uploaded files (images, documents, etc.)
+// Derived from API_BASE_URL by replacing /api with /storage/
+export const STORAGE_URL = API_BASE_URL.replace('/api', '/storage');
+
 console.log('API Base URL:', API_BASE_URL);
 console.log('Socket URL:', SOCKET_URL);
+console.log('Storage URL:', STORAGE_URL);
 
 // Create Axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -36,9 +42,19 @@ export const apiClient: AxiosInstance = axios.create({
 // Request interceptor: add auth token
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const storeToken = useAuthStore.getState().token;
+      const secureToken = await SecureStore.getItemAsync('auth_token');
+      const token = secureToken || storeToken;
+      console.log('🔑 API Request - Token exists:', !!token);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('✅ Authorization header set');
+      } else {
+        console.warn('⚠️ No token found in SecureStore or store');
+      }
+    } catch (error) {
+      console.error('❌ Error getting token:', error);
     }
     return config;
   },
@@ -50,8 +66,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('auth_token');
-      // TODO: trigger logout navigation
+      const authHeader = error.config?.headers?.Authorization || error.config?.headers?.authorization;
+      if (authHeader) {
+        await useAuthStore.getState().logout();
+        console.warn('⚠️ 401 received with auth header - logging out');
+      } else {
+        console.warn('⚠️ 401 received without auth header - not logging out');
+      }
     }
     return Promise.reject(error);
   }

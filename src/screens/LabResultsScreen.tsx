@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { Card } from '../components';
 import labService, { LabRequestDetail, LabTestWithResults, LabResult } from '../services/labService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 const FLAG_CONFIG: Record<string, { color: string; bgColor: string; icon: string }> = {
   normal: { color: '#10B981', bgColor: '#D1FAE5', icon: 'checkmark-circle' },
@@ -60,6 +61,12 @@ export default function LabResultsScreen({ route, navigation }: any) {
   useEffect(() => {
     fetchLabRequest();
   }, [requestId]);
+
+  useRealtimeRefresh(fetchLabRequest, {
+    events: ['lab_results.ready', 'lab_request.created', 'service.completed'],
+    intervalMs: 30000,
+    enabled: true,
+  });
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -203,7 +210,7 @@ export default function LabResultsScreen({ route, navigation }: any) {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Lab Results</Text>
         <View style={styles.placeholder} />
@@ -311,14 +318,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.md,
     backgroundColor: COLORS.white,
-    ...SHADOWS.small,
+    ...SHADOWS.sm,
   },
   backButton: {
     padding: SPACING.xs,
   },
   headerTitle: {
-    ...TYPOGRAPHY.h2,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.textPrimary,
   },
   placeholder: {
     width: 32,
@@ -343,7 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   statusText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: '600',
   },
   urgentBadge: {
@@ -356,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   urgentText: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: '#EF4444',
     fontWeight: '600',
   },
@@ -366,11 +374,11 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     backgroundColor: '#FEE2E2',
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.medium,
+    borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
   },
   criticalAlertText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: '#EF4444',
     flex: 1,
   },
@@ -386,12 +394,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabel: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
   },
   infoValue: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textPrimary,
     fontWeight: '500',
   },
   notesSection: {
@@ -401,17 +409,18 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
   },
   notesLabel: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
   },
   notesText: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textPrimary,
   },
   sectionTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
   },
   testCard: {
@@ -429,12 +438,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   testName: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: '600',
-    color: COLORS.text,
+    color: COLORS.textPrimary,
   },
   testCode: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
@@ -452,7 +461,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   resultBadgeText: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
   },
   testContent: {
@@ -462,7 +471,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
   },
   testDescription: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
     fontStyle: 'italic',
@@ -473,7 +482,7 @@ const styles = StyleSheet.create({
   resultRow: {
     backgroundColor: COLORS.background,
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.medium,
+    borderRadius: BORDER_RADIUS.md,
   },
   resultMain: {
     flexDirection: 'row',
@@ -482,8 +491,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   parameterName: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textPrimary,
     flex: 1,
   },
   resultValueRow: {
@@ -492,11 +501,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   resultValue: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.textPrimary,
   },
   resultUnit: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
   },
   resultMeta: {
@@ -505,7 +515,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   referenceRange: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
   },
   flagBadge: {
@@ -514,14 +524,14 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.small,
+    borderRadius: BORDER_RADIUS.sm,
   },
   flagText: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '600',
   },
   resultComments: {
-    ...TYPOGRAPHY.caption,
+    fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
     fontStyle: 'italic',
@@ -531,7 +541,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
   },
   pendingText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.textTertiary,
     marginTop: SPACING.sm,
   },
@@ -539,17 +549,18 @@ const styles = StyleSheet.create({
     height: SPACING.xl,
   },
   loadingText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.textSecondary,
     marginTop: SPACING.md,
   },
   errorTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.text,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.textPrimary,
     marginTop: SPACING.md,
   },
   errorText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,
     textAlign: 'center',
@@ -558,7 +569,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   backLinkText: {
-    ...TYPOGRAPHY.body,
+    fontSize: TYPOGRAPHY.fontSize.base,
     color: COLORS.primary,
     fontWeight: '600',
   },

@@ -48,6 +48,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 
 import SplashScreen from './src/screens/SplashScreen';
 
+import VerificationPendingScreen from './src/screens/VerificationPendingScreen';
+
 import LabRequestsScreen from './src/screens/LabRequestsScreen';
 
 import LabResultsScreen from './src/screens/LabResultsScreen';
@@ -55,6 +57,18 @@ import LabResultsScreen from './src/screens/LabResultsScreen';
 import LabConsentScreen from './src/screens/LabConsentScreen';
 
 import WalletScreen from './src/screens/WalletScreen';
+
+import EditProfileScreen from './src/screens/EditProfileScreen';
+
+import MedicalRecordsScreen from './src/screens/MedicalRecordsScreen';
+
+import AddMedicalRecordScreen from './src/screens/AddMedicalRecordScreen';
+
+import PrescriptionDetailScreen from './src/screens/PrescriptionDetailScreen';
+
+import LabResultDetailScreen from './src/screens/LabResultDetailScreen';
+
+import ConsultationNoteDetailScreen from './src/screens/ConsultationNoteDetailScreen';
 
 import { COLORS } from './src/constants/theme';
 
@@ -208,6 +222,7 @@ function AppContent() {
             <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="GooglePhone" component={GooglePhoneScreen} />
+            <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
 
           </>
 
@@ -232,6 +247,18 @@ function AppContent() {
             <Stack.Screen name="LabConsent" component={LabConsentScreen} />
 
             <Stack.Screen name="Wallet" component={WalletScreen} />
+
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+
+            <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
+
+            <Stack.Screen name="AddMedicalRecord" component={AddMedicalRecordScreen} />
+
+            <Stack.Screen name="PrescriptionDetail" component={PrescriptionDetailScreen} />
+
+            <Stack.Screen name="LabResultDetail" component={LabResultDetailScreen} />
+
+            <Stack.Screen name="ConsultationNoteDetail" component={ConsultationNoteDetailScreen} />
 
           </>
 

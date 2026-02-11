@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
 import { Card, Button } from '../components';
 import labService, { LabRequestDetail } from '../services/labService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 export default function LabConsentScreen({ navigation, route }: any) {
   const { requestId } = route.params;
@@ -37,28 +38,57 @@ export default function LabConsentScreen({ navigation, route }: any) {
     fetchRequest();
   }, [fetchRequest]);
 
+  useRealtimeRefresh(fetchRequest, {
+    events: ['lab_request.created', 'lab_results.ready', 'service.completed'],
+    intervalMs: 30000,
+    enabled: true,
+  });
+
+  const getPaymentMethod = (): string => {
+    return request?.payment_method || 'wallet';
+  };
+
+  const getPaymentLabel = (): string => {
+    const method = getPaymentMethod();
+    switch (method) {
+      case 'wallet': return 'Wallet';
+      case 'mpesa': return 'M-Pesa';
+      case 'cash': return 'Cash';
+      case 'insurance': return 'Insurance';
+      case 'card': return 'Card';
+      default: return 'Wallet';
+    }
+  };
+
   const handleConfirm = async () => {
     if (!request) return;
 
     const testsTotal = request.tests?.reduce((sum, test) => sum + (parseFloat(String(test.price)) || 0), 0) || 0;
     const fee = parseFloat(String(request.collection_fee)) || 0;
     const total = testsTotal + fee;
+    const paymentMethod = getPaymentMethod();
+    const paymentLabel = getPaymentLabel();
 
     Alert.alert(
-      'Confirm Wallet Payment',
-      `Pay KES ${total.toLocaleString()} from your wallet for lab tests?\n\nBreakdown:\n• Lab Tests: KES ${testsTotal.toLocaleString()}\n• Sample Collection: KES ${fee.toLocaleString()}`,
+      `Confirm ${paymentLabel} Payment`,
+      `Pay KES ${total.toLocaleString()} via ${paymentLabel} for lab tests?\n\nBreakdown:\n• Lab Tests: KES ${testsTotal.toLocaleString()}\n• Sample Collection: KES ${fee.toLocaleString()}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Pay via Wallet',
+          text: `Pay via ${paymentLabel}`,
           onPress: async () => {
             setConfirming(true);
             try {
-              const result = await labService.confirmAndPay(requestId, 'wallet');
+              const result = await labService.confirmAndPay(requestId, paymentMethod);
               const newBalance = result?.payment?.new_wallet_balance;
+              let successMsg = `KES ${total.toLocaleString()} paid via ${paymentLabel}.`;
+              if (paymentMethod === 'wallet' && newBalance != null) {
+                successMsg += `\nNew wallet balance: KES ${Number(newBalance).toLocaleString()}`;
+              }
+              successMsg += '\n\nThe lab has been notified and will dispatch a sample collector shortly.';
               Alert.alert(
                 'Payment Successful',
-                `KES ${total.toLocaleString()} paid from your wallet.${newBalance != null ? `\nNew wallet balance: KES ${Number(newBalance).toLocaleString()}` : ''}\n\nA sample collector will be dispatched shortly.`,
+                successMsg,
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
               );
             } catch (error: any) {
@@ -237,7 +267,7 @@ export default function LabConsentScreen({ navigation, route }: any) {
 
         <View style={styles.buttonsContainer}>
           <Button
-            title={confirming ? 'Processing Payment...' : 'Confirm & Pay via Wallet'}
+            title={confirming ? 'Processing Payment...' : `Confirm & Pay via ${getPaymentLabel()}`}
             onPress={handleConfirm}
             loading={confirming}
             disabled={confirming}

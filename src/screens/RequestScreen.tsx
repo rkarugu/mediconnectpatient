@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import medicService from '../services/medicService';
 import requestService from '../services/requestService';
 import { MedicalSpecialty, Medic } from '../types/medic';
 import { RequestFormData, LocationData } from '../types/request';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 interface RequestScreenProps {
   navigation: any;
@@ -51,7 +52,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
 
   useEffect(() => {
     loadSpecialties();
-  }, []);
+  }, [loadSpecialties]);
 
   useEffect(() => {
     if (selectedSpecialty) {
@@ -59,14 +60,20 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
     }
   }, [selectedSpecialty, isEmergency]);
 
-  const loadSpecialties = async () => {
+  const loadSpecialties = useCallback(async () => {
     try {
       const data = await medicService.getMedicalSpecialties();
       setSpecialties(data);
     } catch (error) {
       console.error('Load specialties error:', error);
     }
-  };
+  }, []);
+
+  useRealtimeRefresh(loadSpecialties, {
+    events: ['service_request.accepted', 'medic.assigned'],
+    intervalMs: 30000,
+    enabled: true,
+  });
 
   const calculatePrice = () => {
     if (!selectedSpecialty) return;

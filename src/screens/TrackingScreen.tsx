@@ -18,6 +18,8 @@ import { Button, LoadingSpinner, Card, Avatar } from '../components';
 import RequestCard from '../components/RequestCard';
 import requestHistoryService, { RequestHistoryItem } from '../services/requestHistoryService';
 import socketService from '../services/socketService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
+import { STORAGE_URL } from '../config/api';
 
 interface TrackingScreenProps {
   navigation: any;
@@ -168,6 +170,25 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
     }
   };
 
+  useRealtimeRefresh(() => {
+    if (selectedRequest?.id) {
+      return loadRequestDetails(selectedRequest.id, true);
+    }
+    return loadRequests();
+  }, {
+    events: [
+      'service_request.accepted',
+      'medic.assigned',
+      'medic.arrived',
+      'treatment.started',
+      'service.completed',
+      'lab_request.created',
+      'payment.processed',
+    ],
+    intervalMs: 30000,
+    enabled: true,
+  });
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadRequests();
@@ -180,9 +201,17 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
   };
 
   const handlePayWithWallet = async (requestId: number) => {
+    const amount = selectedRequest?.final_total
+      || selectedRequest?.estimated_price
+      || selectedRequest?.amount
+      || selectedRequest?.consultation_fee
+      || 0;
+
+    const displayAmount = amount > 0 ? `\nAmount: KES ${Number(amount).toLocaleString()}` : '';
+
     Alert.alert(
       'Confirm Wallet Payment',
-      'Pay using your wallet balance?',
+      `Pay using your wallet balance?${displayAmount}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -191,8 +220,9 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
             try {
               const result = await requestHistoryService.initiatePayment(requestId, {
                 payment_method: 'wallet',
+                ...(amount > 0 ? { amount } : {}),
               });
-              Alert.alert('Payment Successful', 'Paid successfully via wallet');
+              Alert.alert('Payment Successful', result?.message || 'Paid successfully via wallet');
               // Refresh request details to reflect paid status
               loadRequestDetails(requestId);
               loadRequests();
@@ -324,7 +354,7 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
           <View style={styles.medicInfo}>
             {medicProfilePicture ? (
               <Image 
-                source={{ uri: `http://10.210.19.13:8000/storage/${medicProfilePicture}` }} 
+                source={{ uri: `${STORAGE_URL}/${medicProfilePicture}` }} 
                 style={styles.medicProfileImage}
               />
             ) : (

@@ -43,6 +43,14 @@ export const isPhoneAlreadyExistsError = (error: any): boolean => {
   return error?.response?.status === 422 && error?.response?.data?.error_code === 'PHONE_EXISTS';
 };
 
+export const isEmailNotVerifiedError = (error: any): boolean => {
+  return error?.response?.status === 403 && error?.response?.data?.error_code === 'EMAIL_NOT_VERIFIED';
+};
+
+export const getEmailFromError = (error: any): string | undefined => {
+  return error?.response?.data?.email;
+};
+
 export const getIdentifierType = (identifier: string): 'email' | 'phone' | null => {
   if (validateEmail(identifier).valid) return 'email';
   if (validatePhone(identifier).valid) return 'phone';

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useAuthStore } from '../store/authStore';
+import { authService } from '../services/authService';
+import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 
 const { width: SW } = Dimensions.get('window');
 const TILE_W = (SW - 40 - 36) / 4;
@@ -42,7 +44,23 @@ const I = ({ n, s, sz, c }: { n: string; s: IS; sz: number; c: string }) => {
 
 export default function ProfileScreen({ navigation }: any) {
   const ins = useSafeAreaInsets();
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser } = useAuthStore();
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const latest = await authService.getCurrentUser();
+      if (latest) {
+        await updateUser(latest);
+      }
+    } catch (error) {
+      console.error('Failed to refresh user profile:', error);
+    }
+  }, [updateUser]);
+
+  useRealtimeRefresh(refreshUser, {
+    intervalMs: 30000,
+    enabled: true,
+  });
   const handleLogout = () => Alert.alert('Sign Out', 'Are you sure?', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Sign Out', style: 'destructive', onPress: logout },
@@ -58,7 +76,7 @@ export default function ProfileScreen({ navigation }: any) {
   ];
 
   const acct = [
-    { ic: 'person-outline', is: 'ion' as IS, lb: 'Edit Profile', sub: 'Personal information', g: ['#60A5FA','#2563EB'] as [string,string], onPress: () => {} },
+    { ic: 'person-outline', is: 'ion' as IS, lb: 'Edit Profile', sub: 'Personal information', g: ['#60A5FA','#2563EB'] as [string,string], onPress: () => navigation.navigate('EditProfile') },
     { ic: 'wallet-outline', is: 'ion' as IS, lb: 'My Wallet', sub: 'Balance & transactions', g: ['#34D399','#059669'] as [string,string], onPress: () => navigation.navigate('Wallet') },
     { ic: 'credit-card-outline', is: 'mci' as IS, lb: 'Payment Methods', sub: 'M-Pesa, cards & more', g: ['#C084FC','#7C3AED'] as [string,string], onPress: () => {} },
     { ic: 'clipboard-text-clock-outline', is: 'mci' as IS, lb: 'Request History', sub: 'Past consultations & labs', g: ['#FBBF24','#D97706'] as [string,string], onPress: () => navigation.navigate('Tracking') },
@@ -67,7 +85,7 @@ export default function ProfileScreen({ navigation }: any) {
   const hlth = [
     { ic: 'flask-outline', is: 'ion' as IS, lb: 'Lab Results', sub: 'View test results & reports', g: ['#C084FC','#7C3AED'] as [string,string], onPress: () => navigation.navigate('LabResults') },
     { ic: 'pill', is: 'mci' as IS, lb: 'Prescriptions', sub: 'Medication & prescriptions', g: ['#34D399','#059669'] as [string,string], onPress: () => {} },
-    { ic: 'file-document-outline', is: 'mci' as IS, lb: 'Medical Records', sub: 'Health history & documents', g: ['#60A5FA','#2563EB'] as [string,string], onPress: () => {} },
+    { ic: 'file-document-outline', is: 'mci' as IS, lb: 'Medical Records', sub: 'Health history & documents', g: ['#60A5FA','#2563EB'] as [string,string], onPress: () => navigation.navigate('MedicalRecords') },
   ];
 
   const supp = [

@@ -11,6 +11,7 @@ import {
   Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { STORAGE_URL } from '../config/api';
 
 interface MedicData {
   request_id: number;
@@ -32,9 +33,6 @@ interface MedicAcceptedModalProps {
   onClose: () => void;
   onViewRequest: () => void;
 }
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.210.19.13:8000/api';
-const STORAGE_URL = API_BASE_URL.replace('/api', '/storage/');
 
 export const MedicAcceptedModal: React.FC<MedicAcceptedModalProps> = ({
   visible,
