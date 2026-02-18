@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../config/api';
 import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../constants/theme';
+import { useAuthStore } from '../store/authStore';
 
 interface WalletData {
   balance: number;
@@ -27,22 +28,21 @@ interface WalletData {
 
 interface Transaction {
   id: number;
+  type: 'credit' | 'debit';
   amount: string;
+  balance_after: string;
+  description: string;
   payment_method: string;
-  status: string;
   transaction_id: string;
   created_at: string;
-  service_request_id: number;
-  metadata?: {
-    type?: string;
-    lab_test_request_id?: number;
-    lab_facility_id?: number;
-    collection_fee?: number;
-  };
+  reference_type?: string;
+  reference_id?: number;
+  metadata?: any;
 }
 
 export default function WalletScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { user, updateUser } = useAuthStore();
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,15 +54,33 @@ export default function WalletScreen({ navigation }: any) {
 
   const loadWallet = useCallback(async () => {
     try {
-      const [walletRes, txnRes] = await Promise.all([
+      const [walletRes, statementRes] = await Promise.all([
         apiClient.get('/patients/wallet'),
-        apiClient.get('/patients/wallet/transactions'),
+        apiClient.get('/patients/wallet/statement'),
       ]);
+      
+      console.log('💰 Wallet Response:', JSON.stringify(walletRes.data, null, 2));
+      console.log('📄 Statement Response:', JSON.stringify(statementRes.data, null, 2));
+      
       if (walletRes.data.success) {
+        console.log('✅ Setting wallet data:', walletRes.data.data);
         setWallet(walletRes.data.data);
+        
+        // Update auth store with latest balance
+        if (user && walletRes.data.data?.balance !== undefined) {
+          await updateUser({
+            ...user,
+            wallet_balance: walletRes.data.data.balance,
+          });
+        }
       }
-      if (txnRes.data.success) {
-        setTransactions(txnRes.data.data?.data || []);
+      if (statementRes.data.success) {
+        const txns = statementRes.data.data?.data || statementRes.data.data || [];
+        console.log('📊 Setting transactions:', txns.length, 'items');
+        console.log('📊 First transaction:', txns[0]);
+        setTransactions(txns);
+      } else {
+        console.error('❌ Statement API failed:', statementRes.data);
       }
     } catch (error) {
       console.error('Load wallet error:', error);
@@ -70,14 +88,14 @@ export default function WalletScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user, updateUser]);
 
   useEffect(() => {
     loadWallet();
   }, [loadWallet]);
 
   useRealtimeRefresh(loadWallet, {
-    events: ['payment.processed', 'service.completed', 'lab_request.created'],
+    events: ['payment.processed', 'service.completed', 'lab_request.created', 'wallet.topped_up', 'wallet.debited'],
     intervalMs: 30000,
     enabled: true,
   });
@@ -119,6 +137,14 @@ export default function WalletScreen({ navigation }: any) {
         setTopUpAmount('');
         setTopUpPhone('');
         loadWallet();
+        
+        // Update auth store with new balance
+        if (user && res.data.data?.new_balance !== undefined) {
+          await updateUser({
+            ...user,
+            wallet_balance: res.data.data.new_balance,
+          });
+        }
       } else {
         Alert.alert('Failed', res.data.message || 'Top-up failed');
       }
@@ -159,14 +185,7 @@ export default function WalletScreen({ navigation }: any) {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading wallet...</Text>
-      </View>
-    );
-  }
+  // No full-screen loading - render immediately with available data
 
   return (
     <View style={styles.container}>
@@ -187,8 +206,8 @@ export default function WalletScreen({ navigation }: any) {
         {/* Balance Card */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>
-            KES {(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          <Text style={styles.balanceAmountHeader}>
+            KES {(wallet?.balance ?? user?.wallet_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </Text>
           <TouchableOpacity style={styles.topUpButton} onPress={() => setShowTopUpModal(true)}>
             <Ionicons name="add-circle" size={20} color={COLORS.white} />
@@ -221,47 +240,51 @@ export default function WalletScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Transactions */}
+        {/* Wallet Statement */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Transaction History</Text>
+          <Text style={styles.sectionTitle}>Wallet Statement</Text>
         </View>
 
         {transactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color={COLORS.textSecondary} />
             <Text style={styles.emptyTitle}>No Transactions Yet</Text>
-            <Text style={styles.emptySubtitle}>Your payment history will appear here</Text>
+            <Text style={styles.emptySubtitle}>Your wallet activity will appear here</Text>
           </View>
         ) : (
-          transactions.map((txn) => (
-            <View key={txn.id} style={styles.txnCard}>
-              <View style={styles.txnIconWrap}>
-                <Ionicons name={getMethodIcon(txn.payment_method)} size={20} color={COLORS.white} />
-              </View>
-              <View style={styles.txnDetails}>
-                <Text style={styles.txnTitle}>
-                  {txn.metadata?.type === 'lab_test_payment' ? 'Lab Test Payment' :
-                   txn.payment_method === 'wallet' ? 'Wallet Payment' :
-                   txn.payment_method === 'mpesa' ? 'M-Pesa Payment' :
-                   txn.payment_method === 'cash' ? 'Cash Payment' : 'Payment'}
-                </Text>
-                <Text style={styles.txnRef}>{txn.transaction_id}</Text>
-                <Text style={styles.txnDate}>
-                  {new Date(txn.created_at).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                  })}
-                </Text>
-              </View>
-              <View style={styles.txnRight}>
-                <Text style={styles.txnAmount}>-KES {parseFloat(txn.amount).toLocaleString()}</Text>
-                <View style={[styles.txnStatusBadge, { backgroundColor: getStatusColor(txn.status) + '20' }]}>
-                  <Text style={[styles.txnStatusText, { color: getStatusColor(txn.status) }]}>
-                    {getStatusLabel(txn.status)}
-                  </Text>
-                </View>
-              </View>
+          <View style={styles.statementContainer}>
+            {/* Table Header */}
+            <View style={styles.statementHeader}>
+              <Text style={[styles.statementHeaderText, { flex: 2 }]}>Description</Text>
+              <Text style={[styles.statementHeaderText, { flex: 1, textAlign: 'right' }]}>Debit</Text>
+              <Text style={[styles.statementHeaderText, { flex: 1, textAlign: 'right' }]}>Credit</Text>
+              <Text style={[styles.statementHeaderText, { flex: 1, textAlign: 'right' }]}>Balance</Text>
             </View>
-          ))
+            
+            {/* Transaction Rows */}
+            {transactions.map((txn) => (
+              <View key={txn.id} style={styles.statementRow}>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.statementDesc}>{txn.description}</Text>
+                  <Text style={styles.statementDate}>
+                    {new Date(txn.created_at).toLocaleDateString('en-US', {
+                      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </Text>
+                  <Text style={styles.statementRef}>{txn.transaction_id}</Text>
+                </View>
+                <Text style={[styles.statementAmount, styles.debitAmount, { flex: 1 }]}>
+                  {txn.type === 'debit' ? parseFloat(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
+                </Text>
+                <Text style={[styles.statementAmount, styles.creditAmount, { flex: 1 }]}>
+                  {txn.type === 'credit' ? parseFloat(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
+                </Text>
+                <Text style={[styles.statementAmount, styles.balanceAmount, { flex: 1 }]}>
+                  {parseFloat(txn.balance_after).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -355,7 +378,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   balanceLabel: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
-  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: COLORS.white, marginBottom: 16 },
+  balanceAmountHeader: { fontSize: 36, fontWeight: 'bold', color: COLORS.white, marginBottom: 16 },
   topUpButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -476,4 +499,64 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   confirmBtnText: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+  // Statement styles
+  statementContainer: {
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...SHADOWS.sm,
+  },
+  statementHeader: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  statementHeaderText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    textAlign: 'right',
+  },
+  statementRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    alignItems: 'center',
+  },
+  statementDesc: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  statementDate: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  statementRef: {
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginTop: 1,
+  },
+  statementAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  debitAmount: {
+    color: COLORS.error,
+  },
+  creditAmount: {
+    color: COLORS.success,
+  },
+  balanceAmount: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
 });

@@ -21,6 +21,7 @@ export type User = {
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   emergency_contact_relationship?: string;
+  wallet_balance?: number;
 };
 
 const readPersistedAuth = async () => {

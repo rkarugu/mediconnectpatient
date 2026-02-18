@@ -33,14 +33,6 @@ interface PaymentOptionsModalProps {
 
 const paymentOptions: PaymentOption[] = [
   {
-    id: 'cash',
-    name: 'Cash',
-    description: 'Pay with cash when service is complete',
-    icon: 'cash-outline',
-    color: COLORS.success,
-    available: true,
-  },
-  {
     id: 'mpesa',
     name: 'M-Pesa',
     description: 'Pay using Safaricom M-Pesa',
@@ -81,7 +73,7 @@ export default function PaymentOptionsModal({
   estimatedPrice,
   walletBalance = 0,
 }: PaymentOptionsModalProps) {
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>('cash');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [insuranceDetails, setInsuranceDetails] = useState({
     provider: '',
     memberNumber: '',

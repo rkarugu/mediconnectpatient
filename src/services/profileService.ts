@@ -108,4 +108,9 @@ export const profileService = {
     const response = await apiClient.post('/auth/dependants/bulk', { dependants: payload });
     return response.data;
   },
+
+  async getWalletBalance(): Promise<number> {
+    const response = await apiClient.get('/auth/profile');
+    return response.data.data?.wallet_balance || 0;
+  },
 };

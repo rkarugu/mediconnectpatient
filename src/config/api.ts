@@ -14,8 +14,8 @@ const inferredHost = (() => {
   return hostUri ? hostUri.split(':')[0] : undefined;
 })();
 
-const DEFAULT_API_BASE_URL = 'http://10.16.4.13/api';
-const DEFAULT_SOCKET_URL = 'http://10.16.4.13';
+const DEFAULT_API_BASE_URL = 'https://sys.mediconnect.africa/api';
+const DEFAULT_SOCKET_URL = 'https://sys.mediconnect.africa';
 
 // Read from Expo environment variables (EXPO_PUBLIC_*)
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;

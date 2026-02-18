@@ -18,9 +18,13 @@ import ServiceTypeCard from '../components/ServiceTypeCard';
 import PaymentOptionsModal, { PaymentMethod } from '../components/PaymentOptionsModal';
 import medicService from '../services/medicService';
 import requestService from '../services/requestService';
+import nursingService from '../services/nursingService';
+import { profileService } from '../services/profileService';
 import { MedicalSpecialty, Medic } from '../types/medic';
 import { RequestFormData, LocationData } from '../types/request';
+import { NursingServiceType } from '../services/nursingService';
 import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
+import { useAuthStore } from '../store/authStore';
 
 interface RequestScreenProps {
   navigation: any;
@@ -29,10 +33,14 @@ interface RequestScreenProps {
 
 export default function RequestScreen({ navigation, route }: RequestScreenProps) {
   const { medic, location: initialLocation, specialty: initialSpecialty } = route.params || {};
+  const { user } = useAuthStore();
 
   const [step, setStep] = useState(1);
+  const [cadreType, setCadreType] = useState<'doctor' | 'nurse'>('doctor');
   const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
+  const [nursingServiceTypes, setNursingServiceTypes] = useState<NursingServiceType[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<number | null>(initialSpecialty || null);
+  const [selectedNursingService, setSelectedNursingService] = useState<number | null>(null);
   const [selectedMedic, setSelectedMedic] = useState<Medic | null>(medic || null);
   const [location, setLocation] = useState<LocationData>({
     latitude: initialLocation?.latitude || -1.286389,
@@ -48,17 +56,6 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [walletBalance, setWalletBalance] = useState(5000); // TODO: Fetch actual wallet balance
-
-  useEffect(() => {
-    loadSpecialties();
-  }, [loadSpecialties]);
-
-  useEffect(() => {
-    if (selectedSpecialty) {
-      calculatePrice();
-    }
-  }, [selectedSpecialty, isEmergency]);
 
   const loadSpecialties = useCallback(async () => {
     try {
@@ -69,6 +66,26 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
     }
   }, []);
 
+  const loadNursingServices = async () => {
+    try {
+      const data = await nursingService.getNursingServiceTypes();
+      setNursingServiceTypes(data);
+    } catch (error) {
+      console.error('Load nursing services error:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadSpecialties();
+    loadNursingServices();
+  }, [loadSpecialties]);
+
+  useEffect(() => {
+    if (selectedSpecialty || selectedNursingService) {
+      calculatePrice();
+    }
+  }, [selectedSpecialty, selectedNursingService, isEmergency]);
+
   useRealtimeRefresh(loadSpecialties, {
     events: ['service_request.accepted', 'medic.assigned'],
     intervalMs: 30000,
@@ -76,19 +93,31 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   });
 
   const calculatePrice = () => {
-    if (!selectedSpecialty) return;
-    const specialty = specialties.find(s => s.id === selectedSpecialty);
-    if (specialty) {
-      const price = isEmergency 
-        ? (specialty.emergency_fee || specialty.consultation_fee * 1.5)
-        : specialty.consultation_fee;
-      setEstimatedPrice(price);
+    if (cadreType === 'nurse' && selectedNursingService) {
+      const service = nursingServiceTypes.find(s => s.id === selectedNursingService);
+      if (service) {
+        const price = isEmergency ? service.emergency_fee : service.base_fee;
+        setEstimatedPrice(price);
+      }
+    } else if (cadreType === 'doctor' && selectedSpecialty) {
+      const specialty = specialties.find(s => s.id === selectedSpecialty);
+      if (specialty) {
+        const price = isEmergency 
+          ? (specialty.emergency_fee || specialty.consultation_fee * 1.5)
+          : specialty.consultation_fee;
+        setEstimatedPrice(price);
+      }
     }
   };
 
   const handleSubmitRequest = async () => {
-    if (!selectedSpecialty) {
-      Alert.alert('Error', 'Please select a service type');
+    if (cadreType === 'doctor' && !selectedSpecialty) {
+      Alert.alert('Error', 'Please select a medical specialty');
+      return;
+    }
+
+    if (cadreType === 'nurse' && !selectedNursingService) {
+      Alert.alert('Error', 'Please select a nursing service');
       return;
     }
 
@@ -113,11 +142,14 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
 
     setLoading(true);
     try {
-      if (!selectedSpecialty) {
+      if (cadreType === 'doctor' && !selectedSpecialty) {
         throw new Error('No specialty selected');
       }
+      if (cadreType === 'nurse' && !selectedNursingService) {
+        throw new Error('No nursing service selected');
+      }
       
-      const payload = {
+      const payload: any = {
         specialty_id: selectedSpecialty,
         medic_id: selectedMedic?.id,
         latitude: location.latitude,
@@ -126,9 +158,14 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         scheduled_time: scheduledTime?.toISOString(),
         notes: notes,
         is_emergency: isEmergency,
-        estimated_price: getSelectedSpecialtyFee(),
+        estimated_price: estimatedPrice,
         payment_method: method,
       };
+
+      // Add nursing service type ID if nurse selected
+      if (cadreType === 'nurse' && selectedNursingService) {
+        payload.nursing_service_type_id = selectedNursingService;
+      }
 
       const response = await requestService.createRequest(payload);
 
@@ -213,34 +250,89 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
       <Text style={styles.stepTitle}>Select Service Type</Text>
       <Text style={styles.stepSubtitle}>Choose the medical service you need</Text>
 
+      {/* Cadre Type Toggle */}
+      <View style={styles.cadreToggleContainer}>
+        <TouchableOpacity
+          style={[styles.cadreToggle, cadreType === 'doctor' && styles.cadreToggleActive]}
+          onPress={() => {
+            setCadreType('doctor');
+            setSelectedSpecialty(1); // Doctor specialty ID
+            setSelectedNursingService(null);
+            calculatePrice();
+          }}
+        >
+          <Ionicons 
+            name="medical" 
+            size={24} 
+            color={cadreType === 'doctor' ? COLORS.white : COLORS.textSecondary} 
+          />
+          <Text style={[styles.cadreToggleText, cadreType === 'doctor' && styles.cadreToggleTextActive]}>
+            Doctor
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.cadreToggle, cadreType === 'nurse' && styles.cadreToggleActive]}
+          onPress={() => {
+            setCadreType('nurse');
+            setSelectedSpecialty(2); // Nurse specialty ID
+            setSelectedNursingService(null);
+            calculatePrice();
+          }}
+        >
+          <Ionicons 
+            name="fitness" 
+            size={24} 
+            color={cadreType === 'nurse' ? COLORS.white : COLORS.textSecondary} 
+          />
+          <Text style={[styles.cadreToggleText, cadreType === 'nurse' && styles.cadreToggleTextActive]}>
+            Nurse
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.serviceList}
         showsVerticalScrollIndicator={false}
       >
-        {specialties.map((specialty, index) => (
+        {cadreType === 'doctor' ? (
           <ServiceTypeCard
-            key={specialty.id}
-            id={specialty.id}
-            name={specialty.name}
-            description={specialty.description || `${specialty.name} consultation and treatment`}
-            icon={getSpecialtyIcon(specialty.name)}
-            color={getSpecialtyColor(index)}
-            basePrice={specialty.consultation_fee || 1500}
-            selected={selectedSpecialty === specialty.id}
+            key={1}
+            id={1}
+            name="Doctor Consultation"
+            description="Medical diagnosis, treatment, and prescription services"
+            icon="medkit"
+            color={COLORS.primary}
+            basePrice={specialties.find(s => s.id === 1)?.consultation_fee || 1500}
+            selected={selectedSpecialty === 1}
             onPress={() => {
-              setSelectedSpecialty(specialty.id);
-              setEstimatedPrice(isEmergency 
-                ? (specialty.emergency_fee || specialty.consultation_fee * 1.5)
-                : specialty.consultation_fee);
+              setSelectedSpecialty(1);
+              calculatePrice();
             }}
           />
-        ))}
+        ) : (
+          nursingServiceTypes.map((service, index) => (
+            <ServiceTypeCard
+              key={service.id}
+              id={service.id}
+              name={service.name}
+              description={service.description || service.name}
+              icon={service.icon as any || 'fitness'}
+              color={getSpecialtyColor(index)}
+              basePrice={service.base_fee}
+              selected={selectedNursingService === service.id}
+              onPress={() => {
+                setSelectedNursingService(service.id);
+                calculatePrice();
+              }}
+            />
+          ))
+        )}
       </ScrollView>
 
       <Button
         title="Continue"
         onPress={() => setStep(2)}
-        disabled={!selectedSpecialty}
+        disabled={cadreType === 'doctor' ? !selectedSpecialty : !selectedNursingService}
         fullWidth
       />
     </View>
@@ -473,7 +565,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         onClose={() => setShowPaymentModal(false)}
         onSelectPayment={handlePaymentMethodSelected}
         estimatedPrice={estimatedPrice}
-        walletBalance={walletBalance}
+        walletBalance={user?.wallet_balance ?? 0}
       />
     </View>
   );
@@ -675,5 +767,35 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     color: COLORS.textSecondary,
     fontStyle: 'italic',
+  },
+  cadreToggleContainer: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  cadreToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  cadreToggleActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  cadreToggleText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.textSecondary,
+  },
+  cadreToggleTextActive: {
+    color: COLORS.white,
   },
 });

@@ -596,9 +596,26 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
           />
         )}
 
-        {/* Payment Button - show when service is completed and not paid */}
-        {status === 'completed' && selectedRequest.payment_status !== 'paid' && (
-          <View>
+        {/* Payment Button - show when medic arrives or service is completed and not paid */}
+        {(status === 'accepted' || status === 'completed') && selectedRequest.payment_status !== 'paid' && (
+          <Card style={styles.paymentCard}>
+            <View style={styles.paymentHeader}>
+              <Ionicons name="card-outline" size={24} color={COLORS.primary} />
+              <Text style={styles.paymentTitle}>
+                {status === 'accepted' ? 'Payment Required' : 'Complete Payment'}
+              </Text>
+            </View>
+            <Text style={styles.paymentMessage}>
+              {status === 'accepted' 
+                ? 'Please complete payment before the medic can start treatment.'
+                : 'Complete your payment to receive your prescription.'}
+            </Text>
+            <View style={styles.paymentAmount}>
+              <Text style={styles.paymentAmountLabel}>Amount Due:</Text>
+              <Text style={styles.paymentAmountValue}>
+                KES {selectedRequest.amount?.toLocaleString() || '0'}
+              </Text>
+            </View>
             <Button
               title="Pay with Wallet"
               onPress={() => handlePayWithWallet(selectedRequest.id)}
@@ -609,7 +626,7 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
               onPress={() => navigation.navigate('Payment', { requestId: selectedRequest.id })}
               style={{ marginBottom: SPACING.md, backgroundColor: '#2ECC71' }}
             />
-          </View>
+          </Card>
         )}
 
         {/* Review Button - show when paid but not reviewed */}
@@ -1085,5 +1102,47 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs / 2,
+  },
+  paymentCard: {
+    marginBottom: SPACING.base,
+    backgroundColor: COLORS.primaryLight + '10',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  paymentTitle: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
+  },
+  paymentMessage: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
+    lineHeight: 22,
+  },
+  paymentAmount: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+  },
+  paymentAmountLabel: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.textSecondary,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+  },
+  paymentAmountValue: {
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.primary,
   },
 });
