@@ -1,12 +1,22 @@
 // Medic and Service Types
+export interface CadreModuleRef {
+  id: number;
+  name: string;
+  slug: string;
+  icon?: string;
+  category: string;
+}
+
 export interface MedicalSpecialty {
   id: number;
   name: string;
+  cadre_type?: string;
   description?: string;
   icon?: string;
   color?: string;
   consultation_fee: number;
   emergency_fee: number;
+  modules?: CadreModuleRef[];
 }
 
 export interface Medic {

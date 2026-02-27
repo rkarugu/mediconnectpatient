@@ -200,12 +200,12 @@ class MedicService {
 
   private getMockSpecialties(): MedicalSpecialty[] {
     return [
-      { id: 1, name: 'General Practitioner', icon: 'medical', color: '#0284c7' },
-      { id: 2, name: 'Registered Nurse', icon: 'fitness', color: '#059669' },
-      { id: 3, name: 'Phlebotomist', icon: 'water', color: '#dc2626' },
-      { id: 4, name: 'Physiotherapist', icon: 'body', color: '#7c3aed' },
-      { id: 5, name: 'Ambulance Service', icon: 'car', color: '#ea580c' },
-      { id: 6, name: 'Telemedicine Doctor', icon: 'videocam', color: '#2563eb' },
+      { id: 1, name: 'General Practitioner', icon: 'medical', color: '#0284c7', cadre_type: 'doctor', consultation_fee: 1500, emergency_fee: 2500 },
+      { id: 2, name: 'Registered Nurse', icon: 'fitness', color: '#059669', cadre_type: 'nurse', consultation_fee: 800, emergency_fee: 1200 },
+      { id: 3, name: 'Phlebotomist', icon: 'water', color: '#dc2626', cadre_type: 'nurse', consultation_fee: 500, emergency_fee: 800 },
+      { id: 4, name: 'Physiotherapist', icon: 'body', color: '#7c3aed', cadre_type: 'clinical_officer', consultation_fee: 1200, emergency_fee: 2000 },
+      { id: 5, name: 'Ambulance Service', icon: 'car', color: '#ea580c', cadre_type: 'doctor', consultation_fee: 5000, emergency_fee: 7500 },
+      { id: 6, name: 'Telemedicine Doctor', icon: 'videocam', color: '#2563eb', cadre_type: 'doctor', consultation_fee: 1000, emergency_fee: 1500 },
     ];
   }
 }

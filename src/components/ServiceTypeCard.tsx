@@ -42,7 +42,7 @@ export default function ServiceTypeCard({
         <Text style={styles.description} numberOfLines={2}>
           {description}
         </Text>
-        <Text style={styles.price}>From KES {basePrice.toLocaleString()}</Text>
+        <Text style={styles.price}>From KES {(basePrice || 0).toLocaleString()}</Text>
       </View>
 
       {selected && (

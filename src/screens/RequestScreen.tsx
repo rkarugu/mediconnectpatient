@@ -36,7 +36,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   const { user } = useAuthStore();
 
   const [step, setStep] = useState(1);
-  const [cadreType, setCadreType] = useState<'doctor' | 'nurse'>('doctor');
+  const [cadreType, setCadreType] = useState<string>('doctor');
   const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
   const [nursingServiceTypes, setNursingServiceTypes] = useState<NursingServiceType[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<number | null>(initialSpecialty || null);
@@ -92,6 +92,19 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
     enabled: true,
   });
 
+  // Derive unique cadre types from loaded specialties
+  const cadreTypes = React.useMemo(() => {
+    const types = specialties
+      .map(s => s.cadre_type || 'doctor')
+      .filter((v, i, a) => a.indexOf(v) === i);
+    return types.length > 0 ? types : ['doctor'];
+  }, [specialties]);
+
+  // Specialties filtered by selected cadre type
+  const filteredSpecialties = React.useMemo(() => {
+    return specialties.filter(s => (s.cadre_type || 'doctor') === cadreType);
+  }, [specialties, cadreType]);
+
   const calculatePrice = () => {
     if (cadreType === 'nurse' && selectedNursingService) {
       const service = nursingServiceTypes.find(s => s.id === selectedNursingService);
@@ -99,7 +112,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         const price = isEmergency ? service.emergency_fee : service.base_fee;
         setEstimatedPrice(price);
       }
-    } else if (cadreType === 'doctor' && selectedSpecialty) {
+    } else if (selectedSpecialty) {
       const specialty = specialties.find(s => s.id === selectedSpecialty);
       if (specialty) {
         const price = isEmergency 
@@ -111,7 +124,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   };
 
   const handleSubmitRequest = async () => {
-    if (cadreType === 'doctor' && !selectedSpecialty) {
+    if (!selectedSpecialty) {
       Alert.alert('Error', 'Please select a medical specialty');
       return;
     }
@@ -250,89 +263,86 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
       <Text style={styles.stepTitle}>Select Service Type</Text>
       <Text style={styles.stepSubtitle}>Choose the medical service you need</Text>
 
-      {/* Cadre Type Toggle */}
-      <View style={styles.cadreToggleContainer}>
-        <TouchableOpacity
-          style={[styles.cadreToggle, cadreType === 'doctor' && styles.cadreToggleActive]}
-          onPress={() => {
-            setCadreType('doctor');
-            setSelectedSpecialty(1); // Doctor specialty ID
-            setSelectedNursingService(null);
-            calculatePrice();
-          }}
-        >
-          <Ionicons 
-            name="medical" 
-            size={24} 
-            color={cadreType === 'doctor' ? COLORS.white : COLORS.textSecondary} 
-          />
-          <Text style={[styles.cadreToggleText, cadreType === 'doctor' && styles.cadreToggleTextActive]}>
-            Doctor
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.cadreToggle, cadreType === 'nurse' && styles.cadreToggleActive]}
-          onPress={() => {
-            setCadreType('nurse');
-            setSelectedSpecialty(2); // Nurse specialty ID
-            setSelectedNursingService(null);
-            calculatePrice();
-          }}
-        >
-          <Ionicons 
-            name="fitness" 
-            size={24} 
-            color={cadreType === 'nurse' ? COLORS.white : COLORS.textSecondary} 
-          />
-          <Text style={[styles.cadreToggleText, cadreType === 'nurse' && styles.cadreToggleTextActive]}>
-            Nurse
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Dynamic Cadre Type Toggle */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cadreToggleContainer}>
+        {cadreTypes.map((type) => {
+          const icon: any = type === 'doctor' ? 'medical' : type === 'nurse' ? 'fitness' : type === 'clinical_officer' ? 'pulse' : 'body';
+          const label = type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[styles.cadreToggle, cadreType === type && styles.cadreToggleActive]}
+              onPress={() => {
+                setCadreType(type);
+                setSelectedSpecialty(null);
+                setSelectedNursingService(null);
+                setEstimatedPrice(0);
+              }}
+            >
+              <Ionicons
+                name={icon}
+                size={24}
+                color={cadreType === type ? COLORS.white : COLORS.textSecondary}
+              />
+              <Text style={[styles.cadreToggleText, cadreType === type && styles.cadreToggleTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       <ScrollView
         style={styles.serviceList}
         showsVerticalScrollIndicator={false}
       >
-        {cadreType === 'doctor' ? (
+        {/* Show specialties for selected cadre type */}
+        {filteredSpecialties.map((specialty, index) => (
           <ServiceTypeCard
-            key={1}
-            id={1}
-            name="Doctor Consultation"
-            description="Medical diagnosis, treatment, and prescription services"
-            icon="medkit"
-            color={COLORS.primary}
-            basePrice={specialties.find(s => s.id === 1)?.consultation_fee || 1500}
-            selected={selectedSpecialty === 1}
+            key={specialty.id}
+            id={specialty.id}
+            name={specialty.name}
+            description={specialty.description || specialty.name}
+            icon={specialty.icon as any || getSpecialtyIcon(specialty.name)}
+            color={getSpecialtyColor(index)}
+            basePrice={specialty.consultation_fee}
+            selected={selectedSpecialty === specialty.id}
             onPress={() => {
-              setSelectedSpecialty(1);
+              setSelectedSpecialty(specialty.id);
+              setSelectedNursingService(null);
               calculatePrice();
             }}
           />
-        ) : (
-          nursingServiceTypes.map((service, index) => (
-            <ServiceTypeCard
-              key={service.id}
-              id={service.id}
-              name={service.name}
-              description={service.description || service.name}
-              icon={service.icon as any || 'fitness'}
-              color={getSpecialtyColor(index)}
-              basePrice={service.base_fee}
-              selected={selectedNursingService === service.id}
-              onPress={() => {
-                setSelectedNursingService(service.id);
-                calculatePrice();
-              }}
-            />
-          ))
+        ))}
+
+        {/* Show nursing sub-services when a nurse specialty is selected */}
+        {cadreType === 'nurse' && selectedSpecialty && nursingServiceTypes.length > 0 && (
+          <>
+            <Text style={[styles.stepSubtitle, { marginTop: SPACING.md }]}>Select Nursing Service</Text>
+            {nursingServiceTypes.map((service, index) => (
+              <ServiceTypeCard
+                key={`ns-${service.id}`}
+                id={service.id}
+                name={service.name}
+                description={service.description || service.name}
+                icon={service.icon as any || 'fitness'}
+                color={getSpecialtyColor(index + filteredSpecialties.length)}
+                basePrice={service.base_fee}
+                selected={selectedNursingService === service.id}
+                onPress={() => {
+                  setSelectedNursingService(service.id);
+                  calculatePrice();
+                }}
+              />
+            ))}
+          </>
         )}
       </ScrollView>
 
       <Button
         title="Continue"
         onPress={() => setStep(2)}
-        disabled={cadreType === 'doctor' ? !selectedSpecialty : !selectedNursingService}
+        disabled={!selectedSpecialty || (cadreType === 'nurse' && !selectedNursingService)}
         fullWidth
       />
     </View>
@@ -770,12 +780,12 @@ const styles = StyleSheet.create({
   },
   cadreToggleContainer: {
     flexDirection: 'row',
-    gap: SPACING.md,
     marginBottom: SPACING.lg,
+    maxHeight: 60,
   },
   cadreToggle: {
-    flex: 1,
     flexDirection: 'row',
+    marginRight: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
