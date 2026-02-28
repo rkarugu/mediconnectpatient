@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const MC_LOGO = require('../../assets/mediconnect logo.png');
+const MC_LOGO = require('../../assets/logo.png');
 
 export default function SplashScreen() {
   return (

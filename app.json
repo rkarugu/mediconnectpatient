@@ -2,15 +2,16 @@
   "expo": {
     "name": "MediConnect",
     "slug": "mediconnect-patient-app",
+    "owner": "roykarugu",
     "scheme": "mediconnect-patient",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/mediconnect logo.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/mediconnect logo.png",
-      "resizeMode": "auto",
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0B3D6B"
     },
     "ios": {
@@ -20,10 +21,14 @@
     "android": {
       "package": "com.mediconnect.patient",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/mediconnect logo.png",
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#0B3D6B"
       },
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,7 +41,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "81282144-5b0f-4e09-9f32-2f9ad0cc3406"
+        "projectId": "046a7c51-6ff5-48f5-8605-d5eee9d72324"
       }
     }
   }
