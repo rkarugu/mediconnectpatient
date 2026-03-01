@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/authService';
@@ -11,6 +11,8 @@ import { parseAuthError, formatErrorMessage, isEmailNotVerifiedError, getEmailFr
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
+
+const MC_LOGO = require('../../assets/logo.png');
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
@@ -112,6 +114,7 @@ export default function LoginScreen({ navigation }: any) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
+          <Image source={MC_LOGO} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
         </View>
@@ -207,7 +210,7 @@ export default function LoginScreen({ navigation }: any) {
 const styles = {
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#f5f7fa',
   },
   scrollContent: {
     flexGrow: 1,
@@ -215,7 +218,13 @@ const styles = {
     padding: SPACING.lg,
   },
   header: {
+    alignItems: 'center',
     marginBottom: SPACING.xl * 2,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: SPACING.lg,
   },
   title: {
     fontSize: 32,
@@ -229,6 +238,14 @@ const styles = {
   },
   form: {
     width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   inputContainer: {
     flexDirection: 'row',
