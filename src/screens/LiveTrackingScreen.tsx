@@ -37,8 +37,8 @@ export default function LiveTrackingScreen({ navigation, route }: LiveTrackingSc
 
   useEffect(() => {
     loadMedicLocation();
-    // Poll for medic location every 10 seconds (reduced since we have socket updates)
-    pollingInterval.current = setInterval(loadMedicLocation, 10000);
+    // Poll for medic location every 5 seconds (more frequent since WebSocket may not be available)
+    pollingInterval.current = setInterval(loadMedicLocation, 5000);
 
     return () => {
       if (pollingInterval.current) {

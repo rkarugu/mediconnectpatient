@@ -11,7 +11,7 @@ export default function useRealtimeRefresh(
   refreshFn: () => void | Promise<void>,
   options: RealtimeOptions = {}
 ) {
-  const { events = [], intervalMs = 30000, enabled = true } = options;
+  const { events = [], intervalMs = 10000, enabled = true } = options;
   const refreshRef = useRef(refreshFn);
 
   useEffect(() => {
