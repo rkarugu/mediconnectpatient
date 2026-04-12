@@ -25,6 +25,7 @@ import { RequestFormData, LocationData } from '../types/request';
 import { NursingServiceType } from '../services/nursingService';
 import useRealtimeRefresh from '../hooks/useRealtimeRefresh';
 import { useAuthStore } from '../store/authStore';
+import { apiClient } from '../config/api';
 
 interface RequestScreenProps {
   navigation: any;
@@ -56,6 +57,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
   const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(user?.wallet_balance ?? 0);
 
   const loadSpecialties = useCallback(async () => {
     try {
@@ -139,7 +141,15 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
       return;
     }
 
-    // Show payment selection modal
+    // Fetch latest wallet balance before showing payment modal
+    try {
+      const walletRes = await apiClient.get('/patients/wallet');
+      if (walletRes.data.success) {
+        setWalletBalance(walletRes.data.data.balance);
+      }
+    } catch (e) {
+      console.error('Failed to fetch wallet balance:', e);
+    }
     setShowPaymentModal(true);
   };
 
@@ -575,7 +585,7 @@ export default function RequestScreen({ navigation, route }: RequestScreenProps)
         onClose={() => setShowPaymentModal(false)}
         onSelectPayment={handlePaymentMethodSelected}
         estimatedPrice={estimatedPrice}
-        walletBalance={user?.wallet_balance ?? 0}
+        walletBalance={walletBalance}
       />
     </View>
   );

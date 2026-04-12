@@ -2,7 +2,7 @@
   "expo": {
     "name": "MediConnect",
     "slug": "mediconnect-patient-app",
-    "owner": "roykarugu",
+    "owner": "omoshdev",
     "scheme": "mediconnect-patient",
     "version": "1.0.2",
     "orientation": "portrait",
@@ -19,6 +19,7 @@
       "bundleIdentifier": "com.mediconnect.patient"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.mediconnect.patient",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
@@ -37,11 +38,13 @@
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       "expo-secure-store",
-      "expo-location"
+      "expo-location",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "extra": {
       "eas": {
-        "projectId": "046a7c51-6ff5-48f5-8605-d5eee9d72324"
+        "projectId": "d9f675e2-2ce8-4150-93f7-38de2f6fb415"
       }
     }
   }

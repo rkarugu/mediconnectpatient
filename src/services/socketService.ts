@@ -1,140 +1,45 @@
-import { io, Socket } from 'socket.io-client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SOCKET_URL as CONFIG_SOCKET_URL } from '../config/api';
+/**
+ * Socket service — now delegates to Pusher.
+ * Maintains the same public API (on/off/connect/disconnect) so existing
+ * screens that import socketService continue to work without changes.
+ */
+import pusherService from './pusherService';
 
 class SocketService {
-  private socket: Socket | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private patientId: number | null = null;
   private eventHandlers: Map<string, Function[]> = new Map();
 
   async connect(token: string, userType: 'patient' | 'medical_worker', userId: number) {
-    if (this.socket?.connected) {
-      console.log('Socket already connected');
-      return;
-    }
+    this.patientId = userId;
+    pusherService.connect(token, userType, userId);
 
-    const SOCKET_URL = CONFIG_SOCKET_URL;
+    // Bind all known patient events on the private channel
+    const privateChannel = `private-patient.${userId}`;
+    const events = [
+      'medic.assigned',
+      'medic.arrived',
+      'medic.completed',
+      'medic.location_updated',
+      'service_request.accepted',
+      'service_request.declined',
+      'service_request.cancelled',
+      'service_request.status_changed',
+      'treatment.started',
+      'service.completed',
+      'payment.processed',
+      'review.requested',
+      'lab_request.created',
+      'lab_result.completed',
+      'lab_results.ready',
+      'notification',
+      'new.message',
+    ];
 
-    this.socket = io(SOCKET_URL, {
-      auth: {
-        token,
-        userId,
-        userType,
-      },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: this.maxReconnectAttempts,
-    });
-
-    this.setupEventListeners();
-  }
-
-  private setupEventListeners() {
-    if (!this.socket) return;
-
-    this.socket.on('connect', () => {
-      console.log('Socket connected:', this.socket?.id);
-      this.reconnectAttempts = 0;
-    });
-
-    this.socket.on('connected', (data) => {
-      console.log('Connected to notification server:', data);
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message);
-      this.reconnectAttempts++;
-      
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Max reconnection attempts reached');
-      }
-    });
-
-    this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
-    });
-
-    // Patient-specific events
-    this.socket.on('medic.assigned', (data) => {
-      console.log('Medic assigned:', data);
-      this.triggerHandlers('medic.assigned', data);
-    });
-
-    this.socket.on('medic.arrived', (data) => {
-      console.log('Medic arrived:', data);
-      this.triggerHandlers('medic.arrived', data);
-    });
-
-    this.socket.on('medic.completed', (data) => {
-      console.log('Service completed:', data);
-      this.triggerHandlers('medic.completed', data);
-    });
-
-    this.socket.on('payment.processed', (data) => {
-      console.log('Payment processed:', data);
-      this.triggerHandlers('payment.processed', data);
-    });
-
-    this.socket.on('review.requested', (data) => {
-      console.log('Review requested:', data);
-      this.triggerHandlers('review.requested', data);
-    });
-
-    // Service request events
-    this.socket.on('service_request.accepted', (data) => {
-      console.log('Service request accepted by medic:', data);
-      this.triggerHandlers('service_request.accepted', data);
-    });
-
-    this.socket.on('service_request.declined', (data) => {
-      console.log('Service request declined:', data);
-      this.triggerHandlers('service_request.declined', data);
-    });
-
-    this.socket.on('service_request.cancelled', (data) => {
-      console.log('Service request cancelled:', data);
-      this.triggerHandlers('service_request.cancelled', data);
-    });
-
-    // Treatment and service events
-    this.socket.on('treatment.started', (data) => {
-      console.log('Treatment started:', data);
-      this.triggerHandlers('treatment.started', data);
-    });
-
-    this.socket.on('service.completed', (data) => {
-      console.log('Service completed:', data);
-      this.triggerHandlers('service.completed', data);
-    });
-
-    // Lab request events
-    this.socket.on('lab_request.created', (data) => {
-      console.log('Lab request created:', data);
-      this.triggerHandlers('lab_request.created', data);
-    });
-
-    this.socket.on('lab_results.ready', (data) => {
-      console.log('Lab results ready:', data);
-      this.triggerHandlers('lab_results.ready', data);
-    });
-
-    // Medic location update for live tracking
-    this.socket.on('medic.location_update', (data) => {
-      console.log('Medic location update:', data);
-      this.triggerHandlers('medic.location_update', data);
-    });
-
-    // Generic notification event
-    this.socket.on('notification', (data) => {
-      console.log('Generic notification:', data);
-      this.triggerHandlers('notification', data);
+    events.forEach((event) => {
+      pusherService.on(privateChannel, `.${event}`, (data: any) => {
+        console.log(`[Pusher] ${event}:`, data);
+        this.triggerHandlers(event, data);
+      });
     });
   }
 
@@ -162,50 +67,38 @@ class SocketService {
   private triggerHandlers(event: string, data: any) {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
-      handlers.forEach(handler => handler(data));
+      handlers.forEach((handler) => handler(data));
     }
   }
 
-  emit(event: string, data: any) {
-    if (this.socket?.connected) {
-      this.socket.emit(event, data);
-    } else {
-      console.warn('Socket not connected, cannot emit event:', event);
-    }
-  }
-
+  /**
+   * Subscribe to an additional Pusher private channel (e.g. service-request.{id})
+   */
   subscribe(channels: string[]) {
-    if (this.socket?.connected) {
-      this.socket.emit('subscribe', channels);
-    }
+    channels.forEach((ch) => pusherService.subscribePrivate(ch));
   }
 
   unsubscribe(channels: string[]) {
-    if (this.socket?.connected) {
-      this.socket.emit('unsubscribe', channels);
-    }
+    channels.forEach((ch) => pusherService.unsubscribe(`private-${ch}`));
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.eventHandlers.clear();
-      console.log('Socket disconnected manually');
-    }
+    pusherService.disconnect();
+    this.eventHandlers.clear();
+    this.patientId = null;
+    console.log('Socket/Pusher disconnected');
   }
 
   isConnected(): boolean {
-    return this.socket?.connected || false;
+    return pusherService.isConnected();
+  }
+
+  emit(_event: string, _data: any) {
+    console.warn('emit() is deprecated with Pusher. Use API calls instead.');
   }
 
   ping() {
-    if (this.socket?.connected) {
-      this.socket.emit('ping');
-      this.socket.once('pong', (data) => {
-        console.log('Pong received:', data);
-      });
-    }
+    console.log('Pusher connection state:', pusherService.isConnected() ? 'connected' : 'disconnected');
   }
 }
 

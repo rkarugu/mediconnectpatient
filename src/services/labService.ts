@@ -133,12 +133,17 @@ class LabService {
   /**
    * Confirm and pay for a lab request
    */
-  async confirmAndPay(requestId: number, paymentMethod: string, paymentReference?: string): Promise<any> {
+  async confirmAndPay(requestId: number, paymentMethod: string, phoneNumber?: string): Promise<any> {
     try {
-      const response = await apiClient.post(`/patient/lab/requests/${requestId}/confirm`, {
+      const payload: any = {
         payment_method: paymentMethod,
-        payment_reference: paymentReference,
-      });
+      };
+      
+      if (paymentMethod === 'mpesa' && phoneNumber) {
+        payload.phone_number = phoneNumber;
+      }
+      
+      const response = await apiClient.post(`/patient/lab/requests/${requestId}/confirm`, payload);
       return response.data;
     } catch (error: any) {
       console.error('Confirm lab request error:', error);

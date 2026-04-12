@@ -1,8 +1,8 @@
 import 'react-native-gesture-handler';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
-import { Platform, View, StyleSheet, Image } from 'react-native';
+import { Platform, View, StyleSheet, Image, Vibration } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
 
@@ -14,6 +14,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Audio } from 'expo-av';
+import chatService from './src/services/chatService';
 
 const TAB_ICONS: Record<string, any> = {
   Home: require('./assets/Hospital.jpg'),
@@ -69,6 +71,8 @@ import PrescriptionDetailScreen from './src/screens/PrescriptionDetailScreen';
 import LabResultDetailScreen from './src/screens/LabResultDetailScreen';
 
 import ConsultationNoteDetailScreen from './src/screens/ConsultationNoteDetailScreen';
+import ConversationsScreen from './src/screens/ConversationsScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
 import { COLORS } from './src/constants/theme';
 
@@ -83,8 +87,41 @@ const Tab = createBottomTabNavigator();
 function MainTabs() {
 
   const insets = useSafeAreaInsets();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevUnreadRef = useRef(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
-  
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const count = await chatService.getTotalUnread();
+        if (count > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+          try {
+            if (soundRef.current) {
+              await soundRef.current.setPositionAsync(0);
+              await soundRef.current.playAsync();
+            } else {
+              const { sound } = await Audio.Sound.createAsync(
+                require('./assets/sounds/message.wav'),
+                { shouldPlay: true, volume: 1.0 }
+              );
+              soundRef.current = sound;
+            }
+          } catch (e) {}
+          Vibration.vibrate(300);
+        }
+        prevUnreadRef.current = count;
+        setUnreadCount(count);
+      } catch {}
+    };
+
+    fetchUnread();
+    const poll = setInterval(fetchUnread, 5000);
+    return () => {
+      clearInterval(poll);
+      soundRef.current?.unloadAsync();
+    };
+  }, []);
 
   return (
 
@@ -164,6 +201,23 @@ function MainTabs() {
         component={TrackingScreen}
 
         options={{ tabBarLabel: 'My Requests' }}
+
+      />
+
+      <Tab.Screen 
+
+        name="Messages" 
+
+        component={ConversationsScreen}
+
+        options={{
+          tabBarLabel: 'Messages',
+          tabBarIcon: ({ focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={focused ? COLORS.primary : COLORS.textSecondary} />
+          ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#EF4444', fontSize: 11 },
+        }}
 
       />
 
@@ -259,6 +313,8 @@ function AppContent() {
             <Stack.Screen name="LabResultDetail" component={LabResultDetailScreen} />
 
             <Stack.Screen name="ConsultationNoteDetail" component={ConsultationNoteDetailScreen} />
+
+            <Stack.Screen name="Chat" component={ChatScreen} />
 
           </>
 

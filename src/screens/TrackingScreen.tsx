@@ -499,12 +499,19 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
                   )}
 
                   {(labRequest.status === 'pending' || labRequest.status === 'assigned') && (
-                    <Button
-                      title="Review & Pay"
-                      onPress={() => navigation.navigate('LabConsent', { requestId: labRequest.id })}
-                      style={{ marginTop: SPACING.sm }}
-                      size="sm"
-                    />
+                    labRequest.payment_status === 'paid' ? (
+                      <View style={styles.paidBadge}>
+                        <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                        <Text style={styles.paidText}>Paid - Awaiting Sample Collection</Text>
+                      </View>
+                    ) : (
+                      <Button
+                        title="Review & Pay"
+                        onPress={() => navigation.navigate('LabConsent', { requestId: labRequest.id })}
+                        style={{ marginTop: SPACING.sm }}
+                        size="sm"
+                      />
+                    )
                   )}
 
                   {labRequest.status === 'completed' && (
@@ -596,8 +603,29 @@ export default function TrackingScreen({ navigation, route }: TrackingScreenProp
           />
         )}
 
+        {/* Payment Processing - show when M-Pesa STK push was sent */}
+        {selectedRequest.payment_status === 'processing' && (
+          <Card style={styles.paymentCard}>
+            <View style={styles.paymentHeader}>
+              <Ionicons name="time-outline" size={24} color="#FF9800" />
+              <Text style={[styles.paymentTitle, { color: '#FF9800' }]}>Payment Processing</Text>
+            </View>
+            <Text style={styles.paymentMessage}>
+              An M-Pesa payment prompt has been sent to your phone. Please enter your PIN to complete the payment.
+            </Text>
+            <View style={styles.paymentAmount}>
+              <Text style={styles.paymentAmountLabel}>Amount:</Text>
+              <Text style={styles.paymentAmountValue}>
+                KES {selectedRequest.amount?.toLocaleString() || '0'}
+              </Text>
+            </View>
+          </Card>
+        )}
+
         {/* Payment Button - show when medic arrives or service is completed and not paid */}
-        {(status === 'accepted' || status === 'completed') && selectedRequest.payment_status !== 'paid' && (
+        {(status === 'accepted' || status === 'completed') && 
+         selectedRequest.payment_status !== 'paid' && 
+         selectedRequest.payment_status !== 'processing' && (
           <Card style={styles.paymentCard}>
             <View style={styles.paymentHeader}>
               <Ionicons name="card-outline" size={24} color={COLORS.primary} />
@@ -1047,6 +1075,21 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginLeft: SPACING.xs,
     flex: 1,
+  },
+  paidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success + '15',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginTop: SPACING.sm,
+    gap: SPACING.xs,
+  },
+  paidText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.success,
   },
   emptyLabSection: {
     alignItems: 'center',

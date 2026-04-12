@@ -1,0 +1,97 @@
+{
+  "project_info": {
+    "project_number": "754848642760",
+    "project_id": "mediconnect-ca150",
+    "storage_bucket": "mediconnect-ca150.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754848642760:android:676b7d0d6d71400e5997fd",
+        "android_client_info": {
+          "package_name": "com.mediconnect.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCAIjpurhTEHb_SXh8Fm0TU2-uyAABg7s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754848642760:android:ec9753b67b7d573c5997fd",
+        "android_client_info": {
+          "package_name": "com.mediconnect.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCAIjpurhTEHb_SXh8Fm0TU2-uyAABg7s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754848642760:android:d8af7e139153f1365997fd",
+        "android_client_info": {
+          "package_name": "com.mediconnect.patient"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCAIjpurhTEHb_SXh8Fm0TU2-uyAABg7s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "754848642760-hkib90c8a6uhhahca8jciee3np4htcl7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

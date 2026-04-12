@@ -32,6 +32,7 @@ interface ServiceDetails {
   amount: number;
   status: string;
   completed_at: string;
+  payment_method: string;
 }
 
 export default function PaymentScreen({ navigation, route }: any) {
@@ -42,19 +43,27 @@ export default function PaymentScreen({ navigation, route }: any) {
   const [processing, setProcessing] = useState(false);
   const [serviceDetails, setServiceDetails] = useState<ServiceDetails | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'card'>('mpesa');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'wallet'>('mpesa');
 
   const loadServiceDetails = useCallback(async () => {
     try {
       const details = await requestHistoryService.getRequestDetails(requestId);
+      const preSelectedMethod = details.payment_method || 'mpesa';
+      
       setServiceDetails({
         id: details.id,
         medic_name: details.medic?.name || 'Medical Professional',
         specialty: details.specialty || 'General',
-        amount: details.amount || 500, // Default amount if not set
+        amount: details.amount || 500,
         status: details.status,
         completed_at: details.completed_at,
+        payment_method: preSelectedMethod,
       });
+      
+      // Set payment method from service request (pre-selected at booking)
+      if (preSelectedMethod === 'wallet' || preSelectedMethod === 'mpesa') {
+        setPaymentMethod(preSelectedMethod as 'mpesa' | 'wallet');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to load service details');
     } finally {
@@ -78,6 +87,64 @@ export default function PaymentScreen({ navigation, route }: any) {
     return cleaned.length >= 9 && cleaned.length <= 12;
   };
 
+  const [awaitingMpesa, setAwaitingMpesa] = useState(false);
+  const [mpesaMessage, setMpesaMessage] = useState('');
+
+  const pollPaymentStatus = useCallback(async (paymentId: number, maxAttempts = 20) => {
+    let attempts = 0;
+    const poll = async (): Promise<boolean> => {
+      attempts++;
+      try {
+        const details = await requestHistoryService.getRequestDetails(requestId);
+        const paymentStatus = details.payment_status;
+        
+        if (paymentStatus === 'paid') {
+          setMpesaMessage('Payment confirmed!');
+          setTimeout(() => {
+            Alert.alert(
+              'Payment Successful',
+              'Your payment has been confirmed. The medic will now proceed with treatment.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => navigation.navigate('Tracking', { requestId }),
+                },
+              ]
+            );
+          }, 1000);
+          return true;
+        } else if (paymentStatus === 'failed') {
+          setAwaitingMpesa(false);
+          setProcessing(false);
+          Alert.alert('Payment Failed', 'The M-Pesa payment was not completed. Please try again.');
+          return true;
+        }
+      } catch (e) {
+        console.log('Poll error:', e);
+      }
+
+      if (attempts >= maxAttempts) {
+        setAwaitingMpesa(false);
+        setProcessing(false);
+        Alert.alert(
+          'Payment Pending',
+          'We haven\'t received confirmation yet. If you completed the payment, it will be updated shortly. You can check the status in your tracking screen.',
+          [
+            { text: 'Try Again', style: 'cancel' },
+            { text: 'Go to Tracking', onPress: () => navigation.navigate('Tracking', { requestId }) },
+          ]
+        );
+        return true;
+      }
+
+      // Wait 3 seconds before next poll
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return poll();
+    };
+
+    return poll();
+  }, [requestId, navigation]);
+
   const handleMpesaPayment = async () => {
     if (!validatePhoneNumber(phoneNumber)) {
       Alert.alert('Invalid Phone', 'Please enter a valid M-Pesa phone number');
@@ -94,29 +161,25 @@ export default function PaymentScreen({ navigation, route }: any) {
         formattedPhone = '254' + formattedPhone;
       }
 
-      await requestHistoryService.initiatePayment(requestId, {
+      const result = await requestHistoryService.initiatePayment(requestId, {
         phone_number: formattedPhone,
         amount: serviceDetails?.amount || 500,
         payment_method: 'mpesa',
       });
 
-      Alert.alert(
-        'STK Push Sent',
-        'Please check your phone and enter your M-Pesa PIN to complete the payment.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to review screen after payment
-              navigation.replace('Review', { requestId });
-            },
-          },
-        ]
-      );
+      // STK Push was sent successfully — show waiting UI
+      setAwaitingMpesa(true);
+      setMpesaMessage('STK Push sent! Enter your M-Pesa PIN on your phone...');
+
+      // Start polling for payment confirmation
+      if (result?.payment_id) {
+        pollPaymentStatus(result.payment_id);
+      } else {
+        pollPaymentStatus(0);
+      }
     } catch (error: any) {
-      Alert.alert('Payment Failed', error.message || 'Failed to initiate payment');
-    } finally {
       setProcessing(false);
+      Alert.alert('Payment Failed', error.message || 'Failed to initiate M-Pesa payment. Please try again.');
     }
   };
 
@@ -139,6 +202,28 @@ export default function PaymentScreen({ navigation, route }: any) {
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading payment details...</Text>
+      </View>
+    );
+  }
+
+  if (awaitingMpesa) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingHorizontal: 32 }]}>
+        <View style={styles.mpesaWaitingCard}>
+          <View style={[styles.methodIcon, { backgroundColor: '#4CAF50', width: 72, height: 72, borderRadius: 36, marginBottom: 20 }]}>
+            <Text style={[styles.methodIconText, { fontSize: 36 }]}>M</Text>
+          </View>
+          <ActivityIndicator size="large" color="#4CAF50" style={{ marginBottom: 16 }} />
+          <Text style={styles.mpesaWaitingTitle}>M-Pesa Payment</Text>
+          <Text style={styles.mpesaWaitingMessage}>{mpesaMessage}</Text>
+          <Text style={styles.mpesaWaitingHint}>
+            A payment prompt has been sent to your phone. Please enter your M-Pesa PIN to complete the payment.
+          </Text>
+          <View style={styles.mpesaWaitingAmount}>
+            <Text style={styles.mpesaWaitingAmountLabel}>Amount</Text>
+            <Text style={styles.mpesaWaitingAmountValue}>KES {serviceDetails?.amount?.toLocaleString()}</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -178,32 +263,28 @@ export default function PaymentScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      {/* Payment Method Selection */}
-      <Text style={styles.sectionTitle}>Select Payment Method</Text>
+      {/* Payment Method (Pre-selected at booking) */}
+      <Text style={styles.sectionTitle}>Payment Method</Text>
+      <Text style={styles.sectionSubtitle}>Selected at booking time</Text>
       <View style={styles.methodsContainer}>
-        <TouchableOpacity
-          style={[styles.methodCard, paymentMethod === 'mpesa' && styles.methodCardActive]}
-          onPress={() => setPaymentMethod('mpesa')}
-        >
-          <View style={[styles.methodIcon, { backgroundColor: '#4CAF50' }]}>
-            <Text style={styles.methodIconText}>M</Text>
-          </View>
-          <Text style={styles.methodName}>M-Pesa</Text>
-          {paymentMethod === 'mpesa' && (
-            <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} style={styles.checkIcon} />
+        <View style={[styles.methodCard, styles.methodCardActive, styles.methodReadOnly]}>
+          {paymentMethod === 'mpesa' ? (
+            <>
+              <View style={[styles.methodIcon, { backgroundColor: '#4CAF50' }]}>
+                <Text style={styles.methodIconText}>M</Text>
+              </View>
+              <Text style={styles.methodName}>M-Pesa</Text>
+            </>
+          ) : (
+            <>
+              <View style={[styles.methodIcon, { backgroundColor: COLORS.primary }]}>
+                <Ionicons name="wallet" size={20} color={COLORS.white} />
+              </View>
+              <Text style={styles.methodName}>Wallet</Text>
+            </>
           )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.methodCard, paymentMethod === 'card' && styles.methodCardActive, styles.methodDisabled]}
-          disabled
-        >
-          <View style={[styles.methodIcon, { backgroundColor: '#9E9E9E' }]}>
-            <Ionicons name="card" size={20} color={COLORS.white} />
-          </View>
-          <Text style={[styles.methodName, { color: COLORS.textSecondary }]}>Card</Text>
-          <Text style={styles.comingSoon}>Coming Soon</Text>
-        </TouchableOpacity>
+          <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} style={styles.checkIcon} />
+        </View>
       </View>
 
       {/* M-Pesa Phone Input */}
@@ -356,12 +437,22 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginHorizontal: 16,
     marginTop: 24,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginHorizontal: 16,
     marginBottom: 12,
   },
   methodsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 12,
+  },
+  methodReadOnly: {
+    opacity: 1,
+    backgroundColor: '#F0F8FF',
   },
   methodCard: {
     flex: 1,
@@ -482,5 +573,54 @@ const styles = StyleSheet.create({
   securityText: {
     fontSize: 12,
     color: COLORS.textSecondary,
+  },
+  mpesaWaitingCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    width: '100%',
+  },
+  mpesaWaitingTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  mpesaWaitingMessage: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  mpesaWaitingHint: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  mpesaWaitingAmount: {
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  mpesaWaitingAmountLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  mpesaWaitingAmountValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COLORS.primary,
   },
 });
