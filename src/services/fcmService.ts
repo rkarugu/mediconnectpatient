@@ -55,7 +55,7 @@ class FCMService {
         return false;
       }
 
-      const response = await apiClient.post('/patient/fcm-token', {
+      const response = await apiClient.post('/patients/fcm-token', {
         fcm_token: this.fcmToken,
       });
       console.log('FCM token registered with backend:', response.data);
@@ -110,7 +110,7 @@ class FCMService {
    */
   async unregisterToken(): Promise<boolean> {
     try {
-      await apiClient.delete('/patient/fcm-token');
+      await apiClient.delete('/patients/fcm-token');
       this.fcmToken = null;
       console.log('FCM token unregistered');
       return true;

@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { createNavigationContainerRef } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import socketService from '../services/socketService';
+import fcmService from '../services/fcmService';
 import { MedicAcceptedModal } from '../components/MedicAcceptedModal';
 
 // Navigation ref for navigating from outside components
@@ -60,6 +61,7 @@ export function NotificationProvider({ children }: Props) {
   const [medicData, setMedicData] = useState<MedicData | null>(null);
   const notificationListener = useRef<any>();
   const responseListener = useRef<any>();
+  const fcmInitialized = useRef(false);
 
   const connect = useCallback(() => {
     if (!token || !user?.id) return;
@@ -71,6 +73,67 @@ export function NotificationProvider({ children }: Props) {
     socketService.disconnect();
     setIsConnected(false);
   }, []);
+
+  // Initialize FCM when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !token || !user?.id) return;
+    if (fcmInitialized.current) return;
+
+    const initFCM = async () => {
+      try {
+        await fcmService.initialize();
+        fcmInitialized.current = true;
+        console.log('FCM initialized for patient');
+
+        // Handle foreground FCM messages → show local notification
+        fcmService.onForegroundMessage(async (remoteMessage: any) => {
+          console.log('FCM foreground message:', remoteMessage);
+          const { notification, data } = remoteMessage;
+          const title = notification?.title || data?.title || 'MediConnect';
+          const body = notification?.body || data?.body || 'You have a new notification';
+
+          // Show as local notification so it pops up
+          await Notifications.scheduleNotificationAsync({
+            content: { title, body, data: data || {}, sound: 'default' },
+            trigger: null,
+          });
+
+          // If medic accepted, show modal
+          if (data?.type === 'service_request_accepted' || data?.type === 'request_accepted') {
+            setMedicData({
+              request_id: Number(data.request_id),
+              medic_id: Number(data.medic_id),
+              medic_name: data.medic_name || 'Medic',
+              medic_phone: data.medic_phone,
+              specialty: data.specialty,
+              rating: data.rating ? Number(data.rating) : undefined,
+            });
+            setShowMedicModal(true);
+          }
+
+          // If it's a chat message, refresh conversations
+          if (data?.type === 'chat_message') {
+            // Trigger a refresh of conversations list
+          }
+
+          setUnreadCount(prev => prev + 1);
+        });
+
+        // Handle notification tap from background
+        fcmService.onNotificationOpenedApp((remoteMessage: any) => {
+          console.log('FCM notification opened:', remoteMessage);
+          const data = remoteMessage?.data;
+          if (data?.type === 'chat_message' && data?.conversation_id) {
+            // Could navigate to chat screen
+          }
+        });
+      } catch (e) {
+        console.error('FCM init failed:', e);
+      }
+    };
+
+    initFCM();
+  }, [isAuthenticated, token, user?.id]);
 
   useEffect(() => {
     if (!isAuthenticated || !token || !user?.id) {
